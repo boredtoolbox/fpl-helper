@@ -1,11 +1,11 @@
-# Secrets — never commit
+# Secrets: never commit
 secrets/
 *.key
 *.pem
 .env
 .env.*
 
-# Local config (copy from config.example.yaml — it holds your entry IDs)
+# Local config (copy from config.example.yaml; it holds your entry IDs)
 config.yaml
 
 # Data & runtime state
@@ -34,3 +34,10 @@ static/crests/
 .DS_Store
 .idea/
 .vscode/
+
+# Claude Code / AI assistant working files
+.claude/
+.claude.json
+CLAUDE.md
+CLAUDE.local.md
+context.md

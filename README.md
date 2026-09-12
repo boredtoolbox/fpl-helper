@@ -1,22 +1,22 @@
 # FPL Helper
 
 A self-hosted Fantasy Premier League analysis app. Flask + SQLite +
-APScheduler — no Docker, no build step, no JavaScript framework, and no
+APScheduler, with no Docker, no build step, no JavaScript framework and no
 database server to run.
 
 It projects expected points for every player, optionally sanity-checks those
 projections against what FPL creators and the football press are saying, and
 ranks the strongest options in each position under the real FPL constraints.
 
-**The division of labour is deliberate: Python does all the football
-mathematics; the Gemini API only reads natural language and returns structured
-data. The AI never picks your team.** It can lower a start probability, cap a
-doubt, or nudge expected points by at most ±10% — and every one of those
-adjustments is stored with the reason that produced it.
+The division of labour is fixed: Python does all the football mathematics, and
+the Gemini API only reads natural language and returns structured data. The AI
+never picks your team. It can lower a start probability, cap a doubt, or nudge
+expected points by at most ±10%, and every one of those adjustments is stored
+with the reason that produced it.
 
 It runs on any Linux box with Python 3.11+. It is small enough for a Raspberry
-Pi 4 and idles at well under 200 MB of RAM; a £5/month VPS or an old laptop in
-a cupboard is more than enough. Everything below is written for a generic
+Pi 4 and idles at well under 200 MB of RAM, so a £5/month VPS or an old laptop
+in a cupboard is more than enough. Everything below is written for a generic
 Linux install, with Pi-specific notes where the two differ.
 
 ---
@@ -28,15 +28,16 @@ Linux install, with Pi-specific notes where the two differ.
 | **Matches** (`/matches/<gw>`) | The league's own fixtures and results, rather than anything about your squad. **One gameweek per page**, laid out like the Premier League's own fixture pages: club crests either side of the score, a step either side of the bar and the whole season as a strip between them, matches grouped by the day they are played on. Before kickoff, the time and each side's difficulty rating; after it, the scoreline with goalscorers, assists and cards. `/matches` redirects to whichever gameweek is being played, or the one next up. |
 | **My Squads** (`/`) | Your current squad on a pitch, in real club kits, split into keeper / defence / midfield / attack. Per player: what they actually scored that gameweek, their projection, fixture difficulty and availability. Up top: the next transfer deadline, what the squad scored, and what the XI is projected to score next. |
 | **My Stats** (`/stats`) | Gameweek points and ranks, plus your position in every classic league you've joined. |
-| **Squad Builder** (`/builder`) | Two sections. First, the strongest **seven options in each position** for the next ten gameweeks (or however many are left), ranked on what they have been scoring, the difficulty of the run ahead, this app's xPts and FPL's own EP. Second, **what your YouTube creators are saying** — who each of them is telling you to buy, sell, keep, start or captain, in your configured trust order. Both halves describe a player with the same figures: club, price, the fixture run, points per game, minutes per game, xG per game and xA per game. |
-| **Player Stats** (`/players`) | Every player, sortable and filterable, with the underlying numbers: xG, xA, xGI, xGC, DefCon reliability, minutes, form, price, ownership and points per million. Each row opens on a per-opponent history — see below. |
+| **Squad Builder** (`/builder`) | Two sections. First, the strongest **seven options in each position** for the next ten gameweeks (or however many are left), ranked on what they have been scoring, the difficulty of the run ahead, this app's xPts and FPL's own EP. Second, **what your YouTube creators are saying**: who each of them is telling you to buy, sell, keep, start or captain, in your configured trust order. Both halves describe a player with the same figures: club, price, the fixture run, points per game, minutes per game, xG per game and xA per game. |
+| **Player Stats** (`/players`) | Every player, sortable and filterable, with the underlying numbers: xG, xA, xGI, xGC, DefCon reliability, minutes, form, price, ownership and points per million. Each row opens on a per-opponent history, described below. |
 
-Matches is the one page with no team selector — it is about the league, not
-about you. Every other page carries its own **team selector** at the top, so switching squad is
-one click from wherever you are and the choice follows you between pages. On
-Player Stats it marks the players you already own and can filter down to them.
+Matches is the one page with no team selector, because it is about the league
+rather than about you. Every other page carries its own **team selector** at the
+top, so switching squad is one click from wherever you are and the choice
+follows you between pages. On Player Stats it marks the players you already own
+and can filter down to them.
 
-The fixture ticker — six cells coloured by FPL difficulty — appears throughout;
+The fixture ticker, six cells coloured by FPL difficulty, appears throughout;
 italics mean an away fixture.
 
 ### The history behind the fixtures
@@ -44,9 +45,9 @@ italics mean an away fixture.
 The caret next to a name on Player Stats opens two rows of context for the next
 six fixtures, fetched on demand rather than shipped with the table:
 
-* **The club's record** — up to the last five meetings with each upcoming
+* **The club's record**: up to the last five meetings with each upcoming
   opponent, as a result and a scoreline.
-* **The player's own record** — goals, assists and defensive contributions in
+* **The player's own record**: goals, assists and defensive contributions in
   the games he actually played against them, with the minutes behind each.
 
 A club that has no history against an opponent says so, and says *why*: newly
@@ -59,7 +60,7 @@ to the league rather than as a blank run of results. DefCon only exists from
 ## Install on Linux
 
 Python **3.11 or newer** and `git` are the only requirements. SQLite needs no
-installation — it is part of Python's standard library, and the database is
+installation, as it is part of Python's standard library, and the database is
 created on first run at `data/fpl.db`.
 
 ```bash
@@ -73,7 +74,7 @@ sudo dnf install -y python3 python3-pip git
 sudo pacman -S --needed python python-pip git
 ```
 
-Check the version before going further — some long-term-support distros still
+Check the version before going further. Some long-term-support distros still
 ship 3.9, which this will not run on:
 
 ```bash
@@ -96,7 +97,7 @@ cd ~/fpl-helper
 Pick one of the three. They all work; they differ in how much they touch the
 rest of the system.
 
-#### Option A — virtualenv (recommended)
+#### Option A: virtualenv (recommended)
 
 Keeps this app's pinned versions in one directory that you can delete. Nothing
 outside `~/fpl-helper` is touched.
@@ -110,11 +111,11 @@ pip install -r requirements.txt
 
 Re-activate with `source .venv/bin/activate` in any new shell.
 
-#### Option B — no virtualenv, into your user directory
+#### Option B: no virtualenv, into your user directory
 
 If you would rather not deal with activation. Packages land in
-`~/.local/lib/python3.x/` and belong to your user alone — no `sudo`, and the
-system Python's own site-packages are untouched.
+`~/.local/lib/python3.x/` and belong to your user alone, so there is no `sudo`
+involved and the system Python's own site-packages are untouched.
 
 ```bash
 pip3 install --user -r requirements.txt
@@ -128,23 +129,22 @@ also manages. Override it explicitly:
 pip3 install --user --break-system-packages -r requirements.txt
 ```
 
-The flag is safe enough here — everything in `requirements.txt` is a pure
-application dependency — but it is a real trade-off: if `apt` later installs a
-different `requests` or `lxml`, the two can disagree. That is the reason Option
-A is the recommendation, not a nicety. To undo it:
-`pip3 uninstall -y -r requirements.txt`.
+The flag is safe enough here, as everything in `requirements.txt` is a pure
+application dependency, but it is a real trade-off: if `apt` later installs a
+different `requests` or `lxml`, the two can disagree. That is why Option A is
+the recommendation. To undo it: `pip3 uninstall -y -r requirements.txt`.
 
-#### Option C — uv
+#### Option C: uv
 
 If you already use [uv](https://docs.astral.sh/uv/), it creates and populates
-the venv in one step and is dramatically faster on a Pi:
+the venv in one step and is much faster on a Pi:
 
 ```bash
 uv venv
 uv pip install -r requirements.txt
 ```
 
-Treat it as Option A from here on — the interpreter is still `.venv/bin/python`.
+Treat it as Option A from here on; the interpreter is still `.venv/bin/python`.
 
 ### Which interpreter do I use afterwards?
 
@@ -158,7 +158,7 @@ This matters, because cron and systemd get **no activated shell** and a minimal
 
 Option B needs nothing else: `pip3 install --user` puts the packages on the
 system interpreter's import path for your user, so `/usr/bin/python3` finds
-them — but **only when the job runs as that same user**, which is why the
+them, but **only when the job runs as that same user**, which is why the
 systemd unit below sets `User=`.
 
 <details>
@@ -183,7 +183,7 @@ cp config.example.yaml config.yaml
 $EDITOR config.yaml
 ```
 
-`config.yaml` is **gitignored** — it is where everything personal lives, and it
+`config.yaml` is **gitignored**. It is where everything personal lives, and it
 never leaves your machine. `config.example.yaml` is the committed template, and
 the app falls back to it if `config.yaml` is missing, so a fresh clone still
 boots (with no teams).
@@ -196,7 +196,7 @@ At the top of `config.yaml`:
 
 ```yaml
 team_ids:
-  - 1234567          # required — one or more FPL entry IDs
+  - 1234567          # required: one or more FPL entry IDs
   - 7654321
 
 team_labels:         # optional; names the entries in the team selector
@@ -207,18 +207,18 @@ team_labels:         # optional; names the entries in the team selector
 **Finding yours:**
 
 1. Log in at [fantasy.premierleague.com](https://fantasy.premierleague.com).
-2. Go to **Pick Team → View Gameweek History**.
+2. Go to **Pick Team > View Gameweek History**.
 3. The URL reads `.../entry/1234567/history`. That number is your entry ID.
 
-Notes worth knowing:
+Notes:
 
-- List **as many entries as you like** — every page carries a team selector and
+- List **as many entries as you like**. Every page carries a team selector and
   remembers your choice between pages. Each extra team costs a handful of API
   requests per refresh, nothing more.
 - **Entry IDs are not secret in the strict sense** (anyone can view any entry's
   public history), but they identify you personally and link to your name and
-  leagues. Keep `config.yaml` out of git — it already is — and don't paste your
-  IDs into issues or screenshots.
+  leagues. Keep `config.yaml` out of git, which it already is, and don't paste
+  your IDs into issues or screenshots.
 - IDs must be **integers, unquoted**. The keys in `team_labels` must match the
   numbers in `team_ids` exactly.
 - After changing them, restart the app and run a refresh
@@ -252,8 +252,8 @@ How the key is handled, so you can verify the claims:
 - `secrets/` and `*.key` are gitignored, and the key never enters the config,
   the database, the logs or any page. See `Config.gemini_api_key()` in
   `app/config.py`.
-- It is **read at call time, not at startup** — rotate the key and the next run
-  picks it up, with no restart.
+- It is **read at call time, not at startup**, so rotating the key takes effect
+  on the next run with no restart.
 - Only the first non-empty, non-comment line is used, and a key containing
   whitespace is rejected with a clear message rather than being sent as a
   malformed HTTP header.
@@ -261,7 +261,7 @@ How the key is handled, so you can verify the claims:
   panel says so and nothing else changes.
 
 **Prefer an environment variable or a secret store?** Point
-`gemini_api_key_file` at anything readable — `/run/secrets/gemini_key` for a
+`gemini_api_key_file` at anything readable: `/run/secrets/gemini_key` for a
 Docker/Podman secret, or a path you write at boot from your own vault. For
 systemd specifically, `LoadCredential=` is the clean route:
 
@@ -270,12 +270,12 @@ LoadCredential=gemini:/etc/fpl-helper/gemini_key.txt
 Environment="FPL_GEMINI_KEY_FILE=%d/gemini"
 ```
 
-...with `gemini_api_key_file: ${FPL_GEMINI_KEY_FILE}` — note that the config
-does **not** expand environment variables today, so this needs a one-line change
-in `app/config.py`. The file-path default is the supported path.
+...with `gemini_api_key_file: ${FPL_GEMINI_KEY_FILE}`. Note that the config does
+**not** expand environment variables today, so this needs a one-line change in
+`app/config.py`. The file-path default is the supported path.
 
 Model names get retired for new keys, so the model is configurable. If a call
-fails with a 404, the API's error message names the current replacement — put
+fails with a 404, the API's error message names the current replacement. Put
 that in `gemini_model` and re-run the crowd job.
 
 ### Where to put your YouTube creator profiles
@@ -295,9 +295,9 @@ youtube_channels:
 **No API key and no YouTube account is needed.** Each channel is read through
 its public RSS feed; the app resolves a URL or handle to a `UC...` channel id on
 first use and caches it in SQLite, so you never have to dig one out and it costs
-one fetch ever — not one per refresh.
+one fetch ever, not one per refresh.
 
-**The order is load-bearing, not decoration:**
+**The order matters:**
 
 - Transcripts are taken **round-robin** down this list, so one prolific channel
   cannot spend the whole budget and leave the others unheard. When the budget
@@ -307,7 +307,7 @@ one fetch ever — not one per refresh.
 - Creators are gathered **ahead of general news**, so news can never push them
   out of the prompt.
 
-**Keep the list short — around five.** These are consulted on every crowd run.
+**Keep the list short, around five.** These are consulted on every crowd run.
 
 Verify a channel before you trust it:
 
@@ -316,13 +316,12 @@ python tools/find_channel_id.py @LetsTalkFPL
 ```
 
 It prints the resolved id and how many recent videos the feed carries. **If the
-newest video is weeks old, you have the wrong channel** — handles are not unique
+newest video is weeks old, you have the wrong channel.** Handles are not unique
 enough to trust blindly, and an `@handle` is not a channel id. Confirm against
 the creator's actual page.
 
-The rate limits matter more than they look. YouTube will temporarily IP-block a
-burst of transcript requests, so the gatherer spaces them out, caps them, and
-gives up the moment it detects a block:
+YouTube will temporarily IP-block a burst of transcript requests, so the
+gatherer spaces them out, caps them, and gives up the moment it detects a block:
 
 ```yaml
 crowd_max_transcripts: 12          # total per refresh, across all channels
@@ -357,7 +356,7 @@ python -m app.refresh        # Option B: python3 -m app.refresh
 
 This takes a few minutes the first time: it sparse-clones the historical
 dataset and walks the FPL API at roughly one request per second. Later runs are
-much quicker — about 8 seconds when there is nothing new.
+much quicker, about 8 seconds when there is nothing new.
 
 ```bash
 python run.py                # Option B: python3 run.py
@@ -368,7 +367,7 @@ phone or another machine on the network. `--host`, `--port`, `--config` and
 `--no-scheduler` are all available (`python run.py --help`).
 
 From here on the examples say `python`, meaning *whichever interpreter has the
-dependencies* — see [the table above](#which-interpreter-do-i-use-afterwards).
+dependencies*. See [the table above](#which-interpreter-do-i-use-afterwards).
 
 ### Reaching it from elsewhere
 
@@ -415,7 +414,7 @@ ExecStart=/home/<user>/fpl-helper/.venv/bin/python -m waitress \
 Restart=on-failure
 RestartSec=15
 
-# Modest hardening — the app only needs its own directory.
+# Modest hardening: the app only needs its own directory.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
@@ -458,8 +457,8 @@ journalctl -u fpl-helper -f
 <details>
 <summary>Running it under a dedicated system user instead</summary>
 
-Cleaner on a shared or internet-facing box — the app gets no home directory and
-no login shell:
+Cleaner on a shared or internet-facing box, as the app gets no home directory
+and no login shell:
 
 ```bash
 sudo useradd --system --home /opt/fpl-helper --shell /usr/sbin/nologin fplhelper
@@ -474,12 +473,12 @@ Then set `User=fplhelper`, `Group=fplhelper`, `WorkingDirectory=/opt/fpl-helper`
 the unit. Run the cron jobs as `fplhelper` too (`sudo -u fplhelper crontab -e`), and
 make sure `secrets/gemini_key.txt` is owned by `fplhelper` with mode `600`.
 
-Use a virtualenv here regardless of what you chose above — a `--system` account
-has no real home directory for `pip install --user` to write into.
+Use a virtualenv here regardless of what you chose above, as a `--system`
+account has no real home directory for `pip install --user` to write into.
 </details>
 
 The service only serves pages. Both data jobs belong to the scheduler, so the
-site stays up independently of whether a refresh succeeded — see
+site stays up independently of whether a refresh succeeded. See
 [Scheduling](#scheduling).
 
 ---
@@ -488,8 +487,9 @@ site stays up independently of whether a refresh succeeded — see
 
 Two ways:
 
-- **From cron** — see [Scheduling](#scheduling) below. This is the normal path.
-- **From the UI** — the "Refresh now" button, top right. It runs in the
+- **From cron**, covered in [Scheduling](#scheduling) below. This is the normal
+  path.
+- **From the UI**, with the "Refresh now" button, top right. It runs in the
   background and is locked so two refreshes can't overlap.
 
 From the CLI, which is also what cron calls:
@@ -504,13 +504,13 @@ The app does **not** schedule anything itself while `refresh_hour` is `null`
 (the shipped default). Set it to an hour 0-23 if you would rather the web
 process own the schedule and skip cron entirely.
 
-The refresh runs these stages, each independently fault-tolerant — if the FPL
-API or GitHub fails, that stage logs the error and the rest carries on:
+The refresh runs these stages, each independently fault-tolerant: if the FPL
+API or GitHub fails, that stage logs the error and the rest carries on.
 
-1. `bootstrap-static` → players, teams, gameweeks
-2. `fixtures` → all 380 fixtures with difficulty ratings
-3. your entries, picks, history, and every league you are in — rank, league
-   size and your points in it, all from the one `entry/` response
+1. `bootstrap-static` for players, teams and gameweeks
+2. `fixtures` for all 380 fixtures with difficulty ratings
+3. your entries, picks, history, and every league you are in, covering rank,
+   league size and your points in it, all from the one `entry/` response
 4. per-player match histories, for anyone whose club has played since we last
    asked (capped at 180 in a single run)
 5. the historical dataset (weekly)
@@ -519,10 +519,10 @@ API or GitHub fails, that stage logs the error and the rest carries on:
 
 Step 6 also archives what it projected for each gameweek still to come, into
 `projection_history`. `projections` itself is wiped and rebuilt every run, so
-without that the number a gameweek was expected to score is lost the moment it
-kicks off — and cannot be recovered afterwards, because recomputing it would use
-results the model did not have at the time. That archive is what lets the squad
-page show projected against actual.
+without that archive the number a gameweek was expected to score is lost the
+moment it kicks off, and cannot be recovered afterwards, because recomputing it
+would use results the model did not have at the time. That archive is what lets
+the squad page show projected against actual.
 
 **The refresh never calls Gemini.** It only *reads* the adjustments the crowd
 job last stored, so you can hit "Refresh now" as often as you like for free.
@@ -546,10 +546,10 @@ storage flat for the whole season:
 | Projection history | One row per player per gameweek, written while the gameweek is still unplayed and frozen at kick-off. About 25k small rows a season. |
 | `fetch_log` | Diagnostic only; rows older than 90 days are dropped. |
 
-Crowd intel is *replaced*, not archived, because only two rows are ever read:
-the newest successful run feeds the projections, and the newest run of any
-kind feeds the crowd panel. Source documents are the bulk of it — a transcript
-is stored up to 100k characters, twelve per run — so keeping every run costs
+Crowd intel is *replaced* rather than archived, because only two rows are ever
+read: the newest successful run feeds the projections, and the newest run of any
+kind feeds the crowd panel. Source documents are the bulk of it (a transcript
+is stored up to 100k characters, twelve per run), so keeping every run costs
 roughly **357 MB a season**. Replacing holds it near **2 MB**, flat.
 
 Projections keep working from local data throughout: the adjustments they read
@@ -560,9 +560,8 @@ job makes HTTP calls. Data freshness is shown in the footer of every page.
 
 ## The crowd-intel job
 
-Crowd intel is deliberately **not** part of the refresh: it costs one Gemini
-call every time it runs, so it gets its own schedule instead of firing on every
-button press.
+Crowd intel is not part of the refresh: it costs one Gemini call every time it
+runs, so it gets its own schedule instead of firing on every button press.
 
 ```bash
 python -m app.crowd_refresh              # gather, call Gemini, rebuild
@@ -570,8 +569,8 @@ python -m app.crowd_refresh --no-rebuild # store the intel, rebuild later
 python -m app.crowd_refresh --quiet      # warnings and errors only
 ```
 
-It gathers YouTube transcripts + news, makes **one** batched Gemini call (plus a
-single retry if the JSON comes back malformed), stores the ratified
+It gathers YouTube transcripts and news, makes **one** batched Gemini call (plus
+a single retry if the JSON comes back malformed), stores the ratified
 adjustments, then rebuilds projections on top of them. If there is
 no API key, no documents, or the call fails, it exits non-zero and leaves your
 existing projections untouched.
@@ -588,49 +587,49 @@ whether or not a refresh succeeded.
 **Option A / C (virtualenv):**
 
 ```cron
-# FPL data refresh — free, no API calls
+# FPL data refresh: free, no API calls
 0 5 * * * cd /home/<user>/fpl-helper && mkdir -p logs && .venv/bin/python -m app.refresh --quiet >> logs/cron-refresh.log 2>&1
 
-# Crowd intel — one Gemini call per run
+# Crowd intel: one Gemini call per run
 0 6 * * * cd /home/<user>/fpl-helper && mkdir -p logs && .venv/bin/python -m app.crowd_refresh --quiet >> logs/cron-crowd.log 2>&1
 ```
 
-**Option B (`pip install --user`)** — same lines, system interpreter:
+**Option B (`pip install --user`)**, the same lines with the system interpreter:
 
 ```cron
 0 5 * * * cd /home/<user>/fpl-helper && mkdir -p logs && /usr/bin/python3 -m app.refresh --quiet >> logs/cron-refresh.log 2>&1
 0 6 * * * cd /home/<user>/fpl-helper && mkdir -p logs && /usr/bin/python3 -m app.crowd_refresh --quiet >> logs/cron-crowd.log 2>&1
 ```
 
-Four things about those lines are load-bearing:
+Four things about those lines matter:
 
 - **The `cd` is not optional.** Cron starts with no working directory, and
   `config.yaml`, `secrets/` and `data/` are all resolved from the project root.
 - **Name the interpreter explicitly.** Cron's `PATH` is minimal and nothing
   activates a virtualenv for you, so a bare `python` often resolves to nothing
   at all. On Option B, the crontab must belong to the **same user** that ran
-  `pip install --user` — `~/.local` is per-user, so a root crontab will not see
-  those packages.
-- **`mkdir -p logs` matters more than it looks.** `logs/` is gitignored, so a
-  fresh clone will not have it — and the shell opens a `>>` redirect *before*
-  running the command, so a missing directory means the job never starts at all,
-  with no log to say why.
+  `pip install --user`, since `~/.local` is per-user and a root crontab will not
+  see those packages.
+- **Create `logs/` in the job itself.** It is gitignored, so a fresh clone will
+  not have it, and the shell opens a `>>` redirect *before* running the command,
+  so a missing directory means the job never starts at all, with no log to say
+  why.
 - **Order matters.** The refresh runs first so crowd intel reads that morning's
-  official injury flags, and the crowd job rebuilds projections last — so by
+  official injury flags, and the crowd job rebuilds projections last, so by
   06:05 everything on the site reflects both. Keep them an hour apart: they are
   separate processes, and `REFRESH_LOCK` is a `threading.Lock`, which guards
   threads inside one process and cannot stop two processes overlapping.
 
 Cron uses the **system timezone**, which is not necessarily UTC. Confirm what
 yours is with `timedatectl` (or `date`) before picking the hours, and remember
-that in a DST-observing zone an hour can be skipped or repeated — pick times
-away from the 01:00–03:00 window.
+that in a DST-observing zone an hour can be skipped or repeated, so pick times
+away from the window between 01:00 and 03:00.
 
 <details>
 <summary>With systemd timers instead</summary>
 
 Better logging (`journalctl`), a `Persistent=true` catch-up after downtime, and
-the same hardening as the service. Two units per job —
+the same hardening as the service. Two units per job, starting with
 `/etc/systemd/system/fpl-refresh.service`:
 
 ```ini
@@ -675,20 +674,20 @@ journalctl -u fpl-refresh -n 50
 ### Pages update themselves
 
 You do not need to reload anything after a job runs. Every page is served with
-a short data-version token and polls `/api/status` for it — once a minute when
-idle, every five seconds while a job is running. When the token changes, the
+a short data-version token and polls `/api/status` for it, once a minute when
+idle and every five seconds while a job is running. When the token changes, the
 page reloads itself.
 
 That polling is what makes cron work for open tabs: the jobs run in their own
 processes, so there is nothing to push from, and SQLite is the only thing the
 web app and cron share. The same channel carries progress, so the "Refresh now"
-button shows the live stage of a **cron** job — `Refreshing: element_summaries…`
-— not just one you started from the UI.
+button shows the live stage of a **cron** job (`Refreshing:
+element_summaries...`), not just one you started from the UI.
 
-Two details worth knowing:
+Two more details:
 
 - A reload is held back while you are typing in a filter box, and happens when
-  you leave the field — otherwise a 06:00 job would wipe a half-typed search.
+  you leave the field, so that a 06:00 job cannot wipe a half-typed search.
 - A job killed mid-run (power cut, `kill -9`) stops beating; after 15 minutes
   the UI stops believing it and re-enables the button.
 
@@ -712,9 +711,9 @@ xPts = P(start) × appearance points
 ```
 
 **Opponent and venue.** Team attack and defence ratings come from xG for and
-against per match, blended between the current season and last season — weighted
-entirely to history before a ball is kicked, shifting to the current season over
-the first ten gameweeks. Clean sheet probability is Poisson: `exp(−expected
+against per match, blended between the current season and last season, weighted
+entirely to history before a ball is kicked and shifting to the current season
+over the first ten gameweeks. Clean sheet probability is Poisson: `exp(−expected
 goals conceded)`. Newly promoted sides with no top-flight history get a
 below-average prior rather than being treated as average.
 
@@ -722,11 +721,11 @@ below-average prior rather than being treated as average.
 and tackles; midfielders and forwards at 12+ of those plus recoveries.
 Reliability is the share of a player's 60-minute appearances that cleared the
 bar. The stat only exists from 2025/26 onward, so earlier seasons are excluded
-from DefCon maths — averaging them in would halve every rate.
+from DefCon maths, since averaging them in would halve every rate.
 
 **Head-to-head.** A player's record against the upcoming opponent over the last
 two seasons, weighted at ±5% maximum and only above three matches. It's mostly
-noise, so the model barely leans on it — but it is the kind of thing a manager
+noise, so the model barely leans on it, but it is the kind of thing a manager
 wants to see, which is what the expandable rows on Player Stats are for.
 
 **Availability and start probability** come from recent starts, official FPL
@@ -738,7 +737,7 @@ earns a little from cameo minutes.
 
 ## How the Squad Builder scores a player
 
-Four inputs, and deliberately only four — the ones the page says it uses:
+Four inputs, and only four, which are the ones the page says it uses:
 
 ```
 performance   = 0.50 x form  +  0.50 x points per game     (FPL points per match)
@@ -750,37 +749,37 @@ score         = per match  x  matches in the horizon
 
 All three baselines are already points-per-match, so they blend without
 rescaling. Performance is split evenly between form (the last 30 days) and
-points per game (the season): one is the recent truth, the other is the memory
-that stops a single hot fortnight deciding everything.
+points per game (the season), so that a single hot fortnight does not decide
+everything.
 
 **FDR multiplier** runs from x1.25 for a difficulty-1 fixture to x0.75 for a 5,
-averaged across the run. It is applied to performance and to FPL's EP, and
-**not** to xPts — the projection engine has already adjusted per fixture for the
+averaged across the run. It is applied to performance and to FPL's EP, but
+**not** to xPts: the projection engine has already adjusted per fixture for the
 opponent, so multiplying again would count the same difficulty twice.
 
 **xPts is re-scaled instead.** The engine's horizon (`horizon_gws`, 6 by
 default) is shorter than this page's ten, so its per-fixture average is
 stretched across the rest of the run by the ratio of the two windows' average
-difficulty — "the gameweeks the engine has not reached are 8% kinder than the
-ones it has". When the horizon *is* the engine's window the ratio is 1 and
-nothing happens, which is what you want from a correction.
+difficulty, on the basis that "the gameweeks the engine has not reached are 8%
+kinder than the ones it has". When the horizon *is* the engine's window the
+ratio is 1 and nothing happens.
 
 **Multiplying by the number of matches** is what makes a double gameweek worth
 twice a single one and a blank worth nothing. Runs are laid out one cell per
 gameweek so a blank is visible as a gap rather than silently pulling the next
 fixture left.
 
-Three gates, before any of that: a player needs a fixture in the horizon, has to
-be available (FPL's own flags, *and* not reported injured or suspended by the
-crowd layer — anyone the engine has zeroed cannot be recommended here), and has
-to clear the minutes floor, which is the page's one adjustable filter.
+Three gates apply before any of that: a player needs a fixture in the horizon,
+has to be available (FPL's own flags, *and* not reported injured or suspended by
+the crowd layer, since anyone the engine has zeroed cannot be recommended here),
+and has to clear the minutes floor, which is the page's one adjustable filter.
 
 Early in a season form, EP and points per game are three names for the same
 handful of matches, and a weighted blend of one number is that number. The page
 counts how many eligible players that is currently true of and says so, rather
 than implying a blend it is not doing.
 
-**Per-game rates** — minutes, xG and xA — divide by *appearances*, not by
+**Per-game rates** for minutes, xG and xA divide by *appearances*, not by
 gameweeks: a rotation option who has featured twice in six weeks is described by
 the two matches he played, not marked down for the four he watched. Appearances
 come from FPL's own `points_per_game` (total points ÷ appearances, so the count
@@ -794,17 +793,17 @@ sitting on exactly zero points.
 The second half of the Squad Builder turns the crowd layer's output back into
 per-creator advice, in the trust order you configured.
 
-The crowd layer stores **one merged row per player** — availability, a sentiment
-score, a role note — with each line in `reasons` naming the source that said it
-("Let's Talk FPL: expected to be rotated after midweek"). That prefix is the
-only per-creator attribution there is, so it is what the page reads. Lines from
-Official FPL and the news feeds are counted and excluded; they are not creators,
-and they already drive the availability flags everywhere else.
+The crowd layer stores **one merged row per player**, holding availability, a
+sentiment score and a role note, with each line in `reasons` naming the source
+that said it ("Let's Talk FPL: expected to be rotated after midweek"). That
+prefix is the only per-creator attribution there is, so it is what the page
+reads. Lines from Official FPL and the news feeds are counted and excluded; they
+are not creators, and they already drive the availability flags everywhere else.
 
 What the schema does *not* record is a structured verdict, so the chip beside
-each line — **captain / buy / sell / keep / start / minutes risk / out** — is a
-reading of that creator's own wording, and the sentence itself is always printed
-next to it. Where the wording does not commit either way the chip says
+each line, one of **captain / buy / sell / keep / start / minutes risk / out**,
+is a reading of that creator's own wording, and the sentence itself is always
+printed next to it. Where the wording does not commit either way the chip says
 "mentioned" rather than guessing. Sentiment and the role note are merged across
 every source, so they sit in their own column labelled as such rather than being
 attributed to whoever's row they happen to be on.
@@ -821,8 +820,8 @@ going quiet.
 
 ## Team imagery
 
-Shirts and crests are **fetched once and served locally**, never hotlinked —
-pages never touch the network, so the squad pitch and the match list have to
+Shirts and crests are **fetched once and served locally**, never hotlinked.
+Pages never touch the network, so the squad pitch and the match list have to
 draw from `static/kits/` and `static/crests/` or not at all. That also means
 both still render with the host offline.
 
@@ -830,11 +829,11 @@ The two come from different CDNs and neither is keyed by the FPL team `id`:
 
 | | Source | Key |
 | --- | --- | --- |
-| Shirts | `fantasy.premierleague.com/dist/img/shirts/…` | team `code` |
-| Crests | `resources.premierleague.com/premierleague/badges/70/…` | team `code`, prefixed `t` |
+| Shirts | `fantasy.premierleague.com/dist/img/shirts/...` | team `code` |
+| Crests | `resources.premierleague.com/premierleague/badges/70/...` | team `code`, prefixed `t` |
 
 A file is only fetched when it is missing, so the `images` stage does no network
-work on a normal refresh — these change once a season. About 60 files and 450KB
+work on a normal refresh; these change once a season. About 60 files and 450KB
 for the league. Both directories are gitignored.
 
 ---
@@ -842,23 +841,23 @@ for the league. Both directories are gitignored.
 ## Where goalscorers come from
 
 The Matches page needs to know who scored and who assisted in each fixture, and
-there are two places that could answer it. Only one of them actually can.
+there are two places that could answer it.
 
-`player_gw_history` looks like the obvious source — it has `goals_scored` and
-`assists` per player per fixture. It is the wrong one, for two reasons:
+`player_gw_history` looks like the obvious source, since it has `goals_scored`
+and `assists` per player per fixture. It is the wrong one, for two reasons:
 
-- **Its coverage is a budget, not a guarantee.** Element summaries are fetched
-  for whoever has new data, prioritised and capped at `DAILY_SUMMARY_BUDGET` per
-  run, so which players are in it depends on what the last few runs got round to.
+- **Its coverage is capped.** Element summaries are fetched for whoever has new
+  data, prioritised and capped at `DAILY_SUMMARY_BUDGET` per run, so which
+  players are in it depends on what the last few runs got round to.
 - **It files an own goal under the player who scored it**, not the side it
-  counted for — so the goals listed for a team do not add up to that team's
+  counted for, so the goals listed for a team do not add up to that team's
   score.
 
 Reconciling every finished fixture's scoreline against it, 25 of 30 matched; the
 five that did not were exactly the five own goals.
 
 The right source was already being fetched and thrown away: each fixture in the
-`fixtures/` endpoint carries a `stats` array — per-player goals, assists, own
+`fixtures/` endpoint carries a `stats` array of per-player goals, assists, own
 goals, cards, saves and bonus, split home and away. `sync_fixture_stats` now
 stores it in `fixture_stats`, and all 30 of 30 scorelines reconcile.
 
@@ -875,10 +874,10 @@ cleared by a run that sees an empty array.
 
 Gathered daily, best-effort:
 
-- **Official FPL flags** — `status`, `news`, `chance_of_playing_next_round`.
+- **Official FPL flags**: `status`, `news`, `chance_of_playing_next_round`.
   Highest trust; they alone can force a start probability to zero.
-- **News RSS** — via `feedparser`, with article text extracted by `trafilatura`.
-- **YouTube transcripts** — recent videos found through each channel's RSS feed
+- **News RSS**: via `feedparser`, with article text extracted by `trafilatura`.
+- **YouTube transcripts**: recent videos found through each channel's RSS feed
   (no API key needed), transcripts via `youtube-transcript-api`.
 
 Everything goes to Gemini in one batched call that must return strict JSON
@@ -888,7 +887,7 @@ carries on without it. Player names are matched to FPL element IDs with
 `rapidfuzz`; names that can't be matched are stored and listed in the UI rather
 than guessed at.
 
-The ratification rules — the only place crowd data touches a number:
+The ratification rules are the only place crowd data touches a number:
 
 | Signal | Effect |
 | --- | --- |
@@ -899,13 +898,13 @@ The ratification rules — the only place crowd data touches a number:
 
 Every adjustment is written to the database with its reasons, so a projection
 can be traced back to, for example, `6.2 → 0.0` alongside "Official FPL status:
-injured — hamstring".
+injured (hamstring)".
 
 ---
 
 ## Development
 
-`tests/` is gitignored and is **not part of this repository** — the suite was
+`tests/` is gitignored and is **not part of this repository**; the suite was
 kept local to the machine it was written on. If you add one, the points worth
 covering are the xPts components, the ratification rules, Gemini JSON validation
 and its fallback, head-to-head aggregation, and an end-to-end smoke run with
@@ -936,7 +935,7 @@ app/
     crowd_intel.py  sources, Gemini, ratification
     engine.py       xPts projection
     shortlist.py    Squad Builder: per-position scoring + the creator board
-    kits.py         team imagery — shirts and crests, cached under static/
+    kits.py         team imagery: shirts and crests, cached under static/
 templates/          Jinja2, one per page plus shared macros
 static/             one stylesheet, one small JS file
 tools/              find_channel_id.py
@@ -947,11 +946,11 @@ Logs rotate in `logs/` (5 × 2MB). SQLite lives at `data/fpl.db`.
 
 ### Data sources
 
-- [Official FPL API](https://fantasy.premierleague.com/api/) — free, no auth on
+- [Official FPL API](https://fantasy.premierleague.com/api/): free, no auth on
   the endpoints used here. The client sends a real User-Agent, retries with
   backoff, and stays under one request per second.
-- [vaastav/Fantasy-Premier-League](https://github.com/vaastav/Fantasy-Premier-League)
-  — per-gameweek history for past seasons. Sparse-cloned on first run (only the
+- [vaastav/Fantasy-Premier-League](https://github.com/vaastav/Fantasy-Premier-League):
+  per-gameweek history for past seasons. Sparse-cloned on first run (only the
   seasons in `historical_seasons`), then `git pull`ed weekly. Players are matched
   across seasons by the FPL `code`, which is stable, so no name matching is
   needed for historical data.
@@ -966,16 +965,16 @@ gameweek deadline passes, so the page stays empty until your first deadline.
 **Everything shows zero.** Run `python -m app.refresh` and check `logs/fpl-helper.log`.
 
 **A player projects 0.00 xPts.** They're almost certainly flagged. Check the
-Status column on the Player Stats page — a 0% chance of playing forces the
+Status column on the Player Stats page; a 0% chance of playing forces the
 projection to zero by design.
 
 **The crowd panel says "Running on statistics alone."** No Gemini key, or the
 last call failed. The error is shown in that panel and in the log. Everything
 else still works.
 
-**A YouTube channel yields nothing.** Either the channel ID is wrong — re-resolve
+**A YouTube channel yields nothing.** Either the channel ID is wrong (re-resolve
 it with `python tools/find_channel_id.py @handle`, since the `@handle` is not a
-channel ID — or YouTube has temporarily blocked your IP. The log distinguishes
+channel ID), or YouTube has temporarily blocked your IP. The log distinguishes
 the two; a block reads "YouTube blocked transcript requests from this IP" and
 normally clears within the hour. Nothing else in the refresh is affected.
 
