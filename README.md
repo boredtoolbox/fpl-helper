@@ -981,3 +981,22 @@ normally clears within the hour. Nothing else in the refresh is affected.
 **`git pull` fails on the historical dataset.** The app keeps using the existing
 checkout and logs a warning. Force a fresh pull with
 `python -m app.refresh --force-historical`.
+
+## Licence
+
+[PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0),
+full text in [LICENSE](LICENSE).
+
+Use it, run it, modify it and share it freely for any **noncommercial**
+purpose — personal use, research, study, hobby projects, and use by charities,
+schools, universities and government bodies. Redistribute your changes if you
+like; just keep the licence and copyright notice with them.
+
+**Any commercial use needs my written permission first.** That covers selling
+it, running it as a paid or ad-supported service, and using it internally at a
+for-profit company. Ask via [an issue](https://github.com/boredtoolbox/fpl-helper/issues)
+and I'll almost certainly say yes.
+
+Note this is a source-available licence, not an open-source one: the
+noncommercial restriction is deliberate, so the OSI would not certify it and
+GitHub will report the licence as "Other".
