@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ticker, ticker_legend, flag_icon, team_selector %}
+{% block title %}My Squads · FPL Helper{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">My Squads</div>
+    <h1>{{ entry.label if entry else 'Squad' }}</h1>
+  </div>
+  {{ ticker_legend() }}
+</div>
+
+{{ team_selector(all_entries, selected_team_id) }}
+
+{% if no_config %}
+<div class="notice danger">
+  <strong>No team IDs configured.</strong>
+  Add your FPL entry IDs to <code>team_ids</code> in <code>config.yaml</code>, then run a refresh.
+</div>
+
+{% elif not squad or not squad.available %}
+<div class="panel">
+  <div class="empty">
+    <h3>No picks saved for this team yet</h3>
+    <p>
+      FPL only publishes a squad once a gameweek deadline has passed.
+      {% if gameweek.next %}The next deadline is {{ gameweek.next.deadline_time | fmt_time }}.{% endif %}
+    </p>
+    <p>Once it does, this page fills in with the XI, the bench and every projection behind them.</p>
+  </div>
+</div>
+
+{% else %}
+<div class="stat-row" style="margin-bottom:18px">
+  <div class="stat"><span class="k">Gameweek</span><span class="v">{{ squad.event }}</span></div>
+
+  {# What it actually scored, next to what it was projected to. FPL's own total
+     is used where it exists — it has the captain doubled and any hit taken off,
+     neither of which falls out of adding up the picks. #}
+  <div class="stat" title="{% if squad.progress.state == 'live' %}GW{{ squad.event }} is still being played — {{ squad.progress.finished }} of {{ squad.progress.total }} matches finished. A running total is not a result, so it is left out until the gameweek is over.{% elif squad.progress.state == 'upcoming' %}GW{{ squad.event }} has not kicked off yet.{% elif squad.progress.state == 'provisional' %}Every match is played, but FPL has not marked the gameweek data-checked, so bonus points and corrections can still move this.{% else %}Final, as confirmed by FPL. Includes the captain's double and any transfer hit.{% endif %}">
+    <span class="k">GW{{ squad.event }} scored</span>
+    {% if squad.progress.state == 'live' %}
+      {# A partial total beside a whole-gameweek projection reads as a collapse
+         rather than a gameweek that is only half played. #}
+      <span class="v live"><span class="live-dot"></span>in progress</span>
+      <span class="sub">{{ squad.progress.finished }} of {{ squad.progress.total }} matches done</span>
+    {% elif squad.progress.state == 'upcoming' %}
+      <span class="v miss">—</span>
+      <span class="sub">not kicked off yet</span>
+    {% else %}
+      <span class="v {% if squad.scored and squad.scored.points %}good{% endif %}">
+        {{ squad.scored.points if squad.scored else (squad.xi_actual if squad.xi_actual is not none else '—') }}
+      </span>
+      <span class="sub">
+        {%- if squad.scored -%}
+          {{ squad.scored.points_on_bench }} on bench
+          {%- if squad.scored.event_transfers_cost %} · −{{ squad.scored.event_transfers_cost }} hit{% endif -%}
+          {%- if squad.progress.state == 'provisional' %} · not yet final{% endif -%}
+        {%- elif squad.counted < 11 -%}
+          {{ squad.counted }} of 11 players in
+        {%- endif -%}
+      </span>
+    {% endif %}
+  </div>
+
+  {# The other half of the comparison: what the same XI was projected to score
+     for the gameweek it has now played, as that projection stood at the
+     deadline. Captain doubled, because the score beside it is. #}
+  <div class="stat" title="What this XI was projected to score in GW{{ squad.event }}, captain doubled, as the projection stood before kick-off.{% if squad.projected_at %} Recorded {{ squad.projected_at | fmt_time }}.{% else %} Not available: the projection for this gameweek was overwritten before it could be recorded, and recomputing it now would use results the model did not have at the time.{% endif %}">
+    <span class="k">GW{{ squad.event }} projected</span>
+    {% if squad.xi_projected is not none %}
+    <span class="v">{{ squad.xi_projected }}</span>
+    <span class="sub">
+      {%- if squad.over_under is not none -%}
+        <span class="{{ 'good' if squad.over_under >= 0 else 'bad' }}">{{ '%+.1f' % squad.over_under }}</span> vs scored
+      {%- else -%}
+        xPts at the deadline
+      {%- endif -%}
+    </span>
+    {% else %}
+    <span class="v miss">—</span>
+    <span class="sub">not recorded before kick-off</span>
+    {% endif %}
+  </div>
+
+  <div class="stat">
+    <span class="k">XI projected</span>
+    <span class="v">{{ squad.xi_xpts }}</span>
+    <span class="sub">xPts for GW{{ squad.projection_event }}</span>
+  </div>
+
+  {% if gameweek.next %}
+  <div class="stat">
+    <span class="k">Next deadline</span>
+    <span class="v" style="font-size:1rem">{{ gameweek.next.deadline_time | until }}</span>
+    <span class="sub">GW{{ gameweek.next.id }} · {{ gameweek.next.deadline_time | fmt_time }}</span>
+  </div>
+  {% endif %}
+
+  <div class="stat"><span class="k">Formation</span><span class="v">{{ squad.formation }}</span></div>
+  <div class="stat"><span class="k">Squad value</span><span class="v">£{{ squad.squad_value }}m</span></div>
+  {% if squad.captain %}
+  <div class="stat"><span class="k">Captain</span><span class="v" style="font-size:1.05rem">{{ squad.captain.web_name }}</span></div>
+  {% endif %}
+  {% if squad.chips %}
+  <div class="stat">
+    <span class="k">Chips played</span>
+    <span class="v" style="font-size:0.95rem">{{ squad.chips | map(attribute='name') | join(', ') }}</span>
+  </div>
+  {% endif %}
+</div>
+
+{% set rows = [('GKP', squad.xi | selectattr('position_name','equalto','GKP') | list),
+               ('DEF', squad.xi | selectattr('position_name','equalto','DEF') | list),
+               ('MID', squad.xi | selectattr('position_name','equalto','MID') | list),
+               ('FWD', squad.xi | selectattr('position_name','equalto','FWD') | list)] %}
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>Starting XI</h2>
+    <span class="result-count">
+      GW{{ squad.event }} as submitted to FPL
+      {%- if squad.progress.state == 'live' %} · <span class="live"><span class="live-dot"></span>points still moving</span>{% endif -%}
+    </span>
+  </div>
+  {# One band per line, each labelled and ruled off, so the shape of the team
+     reads at a glance instead of having to be inferred from the names. #}
+  <div class="pitch">
+    {% for label, line in rows %}
+    <div class="pitch-line">
+      <span class="line-label">{{ label }}<span class="line-count">{{ line | length }}</span></span>
+      <div class="pitch-row">
+        {% for p in line %}
+          {% set fx = (p.projection.fixtures or [{}])[0] %}
+          <div class="shirt fdr-edge-{{ fx.difficulty or 3 }} {% if p.flagged %}flagged{% endif %}">
+            {% if p.is_captain %}<span class="armband" title="Captain">C</span>
+            {% elif p.is_vice_captain %}<span class="armband vice" title="Vice-captain">V</span>{% endif %}
+            {% if p.gw_points is not none %}
+            <span class="gw-pts{% if p.gw_points >= 6 %} hot{% elif p.gw_points <= 1 %} cold{% endif %}"
+                  title="Scored {{ p.gw_points }} in GW{{ squad.event }}{% if p.multiplier > 1 %}, doubled to {{ p.gw_points * p.multiplier }} as captain{% endif %}">{{ p.gw_points }}</span>
+            {% endif %}
+            {% if p.kit %}
+            <img class="kit" src="{{ url_for('static', filename=p.kit) }}"
+                 alt="{{ p.team_name }} kit" loading="lazy" width="44" height="56">
+            {% else %}
+            <div class="kit kit-missing" aria-hidden="true">{{ p.team_short }}</div>
+            {% endif %}
+            <div class="sname" title="{{ p.web_name }}{% if p.news %} — {{ p.news }}{% endif %}">
+              {{ flag_icon(p.status, p.news, p.chance_of_playing_next_round) }}{{ p.web_name }}
+            </div>
+            {# Club on the left, where they are playing on the right. The venue
+               is said with the ticker's own two glyphs rather than a v/@ prefix,
+               so "away at Sunderland" looks the same here as it does in every
+               fixture run on the site — and it is said once, not twice. The
+               projection has not gone, it has moved into the tooltip. #}
+            <div class="smeta">
+              <span class="opp-mark">{{ p.team_short }}</span>
+              {%- if fx.opp %}
+              <span class="venue {{ 'home' if fx.home else 'away' }}"
+                    title="{{ 'Home to' if fx.home else 'Away to' }} {{ fx.opp }} in GW{{ squad.projection_event }} — difficulty {{ fx.difficulty or '?' }} · projected {{ '%.2f' % (p.projection.xpts or 0) }} xPts">{{ fx.opp }}</span>
+              {%- else %}
+              <span class="venue none" title="No fixture in GW{{ squad.projection_event }} — a blank gameweek">—</span>
+              {%- endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="bench-strip">
+    <span class="bench-label">Bench<span class="line-count">{{ squad.bench | length }}</span></span>
+    {% for p in squad.bench %}
+      {% set fx = (p.projection.fixtures or [{}])[0] %}
+      <div class="shirt bench fdr-edge-{{ fx.difficulty or 3 }} {% if p.flagged %}flagged{% endif %}">
+        {% if p.gw_points is not none %}
+        <span class="gw-pts" title="Scored {{ p.gw_points }} in GW{{ squad.event }} — on the bench">{{ p.gw_points }}</span>
+        {% endif %}
+        {% if p.kit %}
+        <img class="kit" src="{{ url_for('static', filename=p.kit) }}"
+             alt="{{ p.team_name }} kit" loading="lazy" width="34" height="43">
+        {% else %}
+        <div class="kit kit-missing" aria-hidden="true">{{ p.team_short }}</div>
+        {% endif %}
+        <div class="sname">
+          <span class="bench-order">{{ loop.index0 if p.position_name != 'GKP' else 'GK' }}</span>{{ p.web_name }}
+        </div>
+        {# Same two columns as a starting XI card, for the same reason. #}
+        <div class="smeta">
+          <span class="opp-mark">{{ p.team_short }}</span>
+          {%- if fx.opp %}
+          <span class="venue {{ 'home' if fx.home else 'away' }}"
+                title="{{ 'Home to' if fx.home else 'Away to' }} {{ fx.opp }} in GW{{ squad.projection_event }} — difficulty {{ fx.difficulty or '?' }} · projected {{ '%.2f' % (p.projection.xpts or 0) }} xPts">{{ fx.opp }}</span>
+          {%- else %}
+          <span class="venue none" title="No fixture in GW{{ squad.projection_event }} — a blank gameweek">—</span>
+          {%- endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h2>Squad detail</h2></div>
+  <div class="table-scroll">
+    <table data-sortable id="squad-table">
+      <thead>
+        <tr>
+          <th data-type="text" title="Squad member. Hover a status icon for the club news.">Player</th>
+          <th data-type="text" title="Position">Pos</th>
+          <th data-type="text" title="Club">Team</th>
+          <th class="num" title="Points scored in GW{{ squad.event }} — the most recent gameweek this squad was submitted for. Shown before the captain's doubling.">GW{{ squad.event }}</th>
+          <th class="num" title="Selling price: FPL cost ÷ 10">£m</th>
+          <th class="num" title="Total points this season">Pts</th>
+          <th class="num" title="FPL form — average points per match over the last 30 days">Form</th>
+          <th class="num" title="Percentage of FPL managers who own this player">Own %</th>
+          <th class="num" title="This app's projected points for GW{{ squad.projection_event }}">xPts</th>
+          <th class="num" title="Modelled probability of starting the next match">P(start)</th>
+          <th class="num" title="Expected minutes in the next match">xMins</th>
+          <th data-nosort title="The next six fixtures, coloured by FPL difficulty. 🏠 home, ✈️ away.">Next 6</th>
+          <th data-nosort title="Availability: ✓ fit · ? doubtful · ✚ injured · ! suspended · ✕ unavailable">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in squad.picks %}
+        <tr>
+          <td class="name">{{ p.web_name }}{% if p.is_captain %} <span class="badge accent">C</span>{% elif p.is_vice_captain %} <span class="badge">V</span>{% endif %}{% if p.on_bench %} <span class="badge">bench</span>{% endif %}</td>
+          <td><span class="pos">{{ p.position_name }}</span></td>
+          <td><span class="team-tag">{{ p.team_short }}</span></td>
+          {# Sorts on the real figure but reads as a dash when the player has no
+             row for the gameweek at all, which is not the same as scoring 0. #}
+          <td class="num" data-sort="{{ p.gw_points if p.gw_points is not none else -1 }}">
+            {% if p.gw_points is not none %}<strong>{{ p.gw_points }}</strong>{% else %}<span class="miss">—</span>{% endif %}
+          </td>
+          <td class="num">{{ '%.1f' % p.price }}</td>
+          <td class="num">{{ p.total_points }}</td>
+          <td class="num">{{ p.form }}</td>
+          <td class="num">{{ p.selected_by_percent }}</td>
+          <td class="num">{{ '%.2f' % (p.projection.xpts or 0) }}</td>
+          <td class="num">{{ '%.0f%%' % ((p.projection.p_start or 0) * 100) }}</td>
+          <td class="num">{{ '%.0f' % (p.projection.expected_minutes or 0) }}</td>
+          <td>{{ ticker(p.projection.fixtures or []) }}</td>
+          <td class="status-cell">{{ flag_icon(p.status, p.news, p.chance_of_playing_next_round, show_fit=true) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

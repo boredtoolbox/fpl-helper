@@ -1,0 +1,73 @@
+# Copy to config.yaml and fill in your own values.
+
+# Your FPL entry (team) IDs. Find yours by logging in at fantasy.premierleague.com,
+# clicking "Pick Team" -> "View Gameweek History"; the URL is
+# /entry/<THIS NUMBER>/history
+team_ids:
+  - 1234567
+  - 7654321
+
+# Friendly labels for the team selector (optional; falls back to the FPL team name)
+team_labels: {}
+#  1234567: "Main squad"
+#  7654321: "Experiment"
+
+# Path to a plain-text file containing ONLY your Gemini API key.
+# Get one free at https://aistudio.google.com/apikey
+gemini_api_key_file: ./secrets/gemini_key.txt
+
+# Model names change often — keep this configurable.
+gemini_model: "gemini-3.5-flash-lite"
+
+# Hour of day (0-23, local time) for the app's own daily refresh.
+# null -> the app never refreshes by itself; cron owns the schedule.
+refresh_hour: null
+
+db_path: ./data/fpl.db
+historical_repo_dir: ./data/Fantasy-Premier-League
+
+# How many upcoming gameweeks the decision engine projects over.
+horizon_gws: 6
+
+# Seasons to load from the vaastav historical dataset (most recent first).
+historical_seasons:
+  - "2025-26"
+  - "2024-25"
+
+# --- Crowd intelligence sources (all optional) ---
+
+# The FPL creators you trust, IN RANK ORDER — most trusted first.
+# Paste the channel URL or @handle; the app looks up the channel id itself on
+# first use and caches it, so you never need to dig out a UC... string.
+#
+# Rank is load-bearing, not decoration:
+#   * transcripts are taken round-robin in this order, so when the budget runs
+#     out mid-round it is the lowest-ranked creator who misses out;
+#   * the prompt tells Gemini the ranking, so when creators disagree the
+#     higher-ranked view is weighted and the disagreement is reported.
+# These are consulted on EVERY refresh, ahead of general news.
+youtube_channels:
+  - "https://www.youtube.com/@LetsTalkFPL"
+  - "https://www.youtube.com/@FantasyFootballHub"
+  - "https://www.youtube.com/@FPLHarry"
+  - "https://www.youtube.com/@FPLFocal"
+  - "https://www.youtube.com/@FPLMate"
+
+news_rss_feeds:
+  - name: "Premier League news"
+    url: "https://www.premierleague.com/en/rss"
+  - name: "Fantasy Football Scout"
+    url: "https://www.fantasyfootballscout.co.uk/feed/"
+  - name: "BBC Football"
+    url: "https://feeds.bbci.co.uk/sport/football/rss.xml"
+
+# Look back this many days for videos/articles.
+crowd_lookback_days: 3
+# Hard cap on how many source documents get sent to Gemini per refresh.
+crowd_max_documents: 40
+
+# YouTube blocks IPs that scrape transcripts too fast. These keep a daily run
+# comfortably under the limit; raise them only if you stop seeing blocks.
+crowd_max_transcripts: 12          # total transcripts per refresh, across all channels
+crowd_max_videos_per_channel: 4    # newest N videos considered per channel
+crowd_transcript_delay: 2.0        # seconds between transcript requests

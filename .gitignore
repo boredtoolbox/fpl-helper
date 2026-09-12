@@ -1,0 +1,36 @@
+# Secrets — never commit
+secrets/
+*.key
+*.pem
+.env
+.env.*
+
+# Local config (copy from config.example.yaml — it holds your entry IDs)
+config.yaml
+
+# Data & runtime state
+data/
+logs/
+*.db
+*.db-journal
+*.db-wal
+
+# Tests (kept local only)
+tests/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Team imagery, fetched by the refresh job (see app/services/kits.py)
+static/kits/
+static/crests/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/

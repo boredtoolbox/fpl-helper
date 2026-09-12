@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ticker_long, ticker_legend, flag_icon, stat_headers, stat_cells %}
+{% block title %}Squad Builder · FPL Helper{% endblock %}
+
+{% block content %}
+
+{# The scoring model, written out once. It is the header tooltip on the Score
+   column and the text of the notice above the tables, and those two must not be
+   able to disagree with each other. #}
+{% set score_help %}Ranking figure: a per-match score multiplied by how many matches are in the run, so a double gameweek counts twice and a blank counts for nothing.
+
+The per-match score blends three baselines, all of them already in FPL points per match:
+• {{ (weights.perf * 100) | round | int }}% performance — form and points per game, half each
+• {{ (weights.ep * 100) | round | int }}% FPL's own expected points
+• {{ (weights.xpts * 100) | round | int }}% this app's xPts projection
+
+Performance and EP are multiplied by fixture difficulty ({{ fdr_multiplier[1] }}× for a 1 down to {{ fdr_multiplier[5] }}× for a 5). xPts is not: it is already opponent-adjusted per fixture, so a difficulty multiplier on top would count the same fixture twice.{% endset %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Squad Builder</div>
+    <h1>
+      {% if events %}The best {{ top_n }} in each position, GW{{ events[0] }}–GW{{ events[-1] }}
+      {% else %}The best {{ top_n }} in each position{% endif %}
+    </h1>
+  </div>
+  {{ ticker_legend() }}
+</div>
+
+{% if not events %}
+<div class="panel"><div class="empty">
+  <h3>Nothing left to rank over</h3>
+  <p>Every gameweek in the database is finished. Run a refresh — or the season is over.</p>
+</div></div>
+{% else %}
+
+<form class="panel" method="get">
+  <div class="filters">
+    <label class="field">Gameweeks ahead
+      <select name="horizon">
+        {% for n in [3, 4, 5, 6, 8, 10] %}
+        <option value="{{ n }}" {% if n == horizon %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">Min minutes played
+      <input type="number" name="mins" step="90" min="0" max="4000" value="{{ min_minutes }}" style="width:80px">
+    </label>
+    <button type="submit" class="btn-accent">Apply</button>
+    <span class="spacer"></span>
+    <span class="result-count"
+          title="Left out: {{ meta.dropped.unavailable }} flagged unavailable by FPL or reported injured or suspended by your creators, {{ meta.dropped.minutes }} under the minutes floor, {{ meta.dropped.no_fixture }} with no fixture in the run.">
+      {{ meta.eligible }} of {{ pool_size }} players eligible ·
+      {{ events | length }} gameweek{{ '' if events | length == 1 else 's' }} scored
+      {%- if horizon > events | length %}, {{ horizon }} asked for — the season runs out first{% endif %}
+    </span>
+  </div>
+</form>
+
+<div class="notice">
+  <strong>Four inputs, and only four.</strong>
+  What each player has been scoring
+  (<span class="cite">form and points per game, {{ (weights.perf * 100) | round | int }}%</span>),
+  FPL's own expected points
+  (<span class="cite">{{ (weights.ep * 100) | round | int }}%</span>),
+  this app's xPts projection
+  (<span class="cite">{{ (weights.xpts * 100) | round | int }}%</span>),
+  and the difficulty of the fixtures ahead, which multiplies the first two —
+  {{ fdr_multiplier[1] }}× for a green 1 down to {{ fdr_multiplier[5] }}× for a red 5.
+  xPts is left alone by that multiplier because it is already opponent-adjusted per fixture.
+  The total is per match × matches in the run, so a double gameweek earns twice and a blank earns nothing.
+  {% if xpts_events and xpts_events | length < events | length %}
+  The projection engine only reaches GW{{ xpts_events[-1] }}; past that its share of the score is
+  the same per-match rate, re-scaled by how much kinder or harsher the later fixtures are.
+  {% endif %}
+</div>
+
+{% if identical_baselines_pct >= 60 %}
+{# Three numbers that are secretly one number make the weights look broken.
+   Better to say so than to let the page imply a blend it is not doing. #}
+<div class="notice">
+  <strong>Form, EP and points per game are currently the same number</strong> for
+  {{ identical_baselines }} of the {{ meta.eligible }} eligible players ({{ identical_baselines_pct }}%).
+  {{ played_gws }} gameweek{{ '' if played_gws == 1 else 's' }} in, "the last 30 days" <em>is</em> the season
+  and FPL's EP is tracking it, so the blend has little to blend. They separate as the season lengthens.
+</div>
+{% endif %}
+
+{% for pos, label, blurb in position_panels %}
+{% set players = lists[pos] %}
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{ label }}</h2>
+    <span class="result-count">{{ blurb }}</span>
+  </div>
+  {% if not players %}
+  <div class="empty">Nothing clears the filters in this position. Lower the minutes floor.</div>
+  {% else %}
+  <div class="table-scroll">
+    <table data-sortable id="top-{{ label | lower }}">
+      <thead>
+        <tr>
+          <th class="num" data-nosort title="Rank on the Score column.">#</th>
+          <th data-type="text" title="The player's FPL short name; hover for the full name.">Player</th>
+          {{ stat_headers('The next ' ~ (events | length) ~ ' gameweeks, earliest first.') }}
+          <th class="num" title="FPL's OWN expected points for the next gameweek, taken straight from their API. A second opinion, calculated by them, not by this app.">EP</th>
+          <th class="num" title="This app's projected points per fixture, averaged over the gameweeks the projection engine covers. Already opponent-adjusted.">xPts/G</th>
+          <th class="num" title="Average FPL difficulty across the run — 1 is the kindest, 5 the hardest. This is the number the fixture multiplier is built from.">FDR</th>
+          <th class="num" title="{{ score_help }}">Score</th>
+          <th data-nosort title="Availability. An icon appears only when there is something to report:&#10;? doubtful · ✚ injured · ! suspended · ✕ unavailable · ◆ crowd intel&#10;Everything flagged unavailable is already filtered out, so an icon here is a warning, not a block.">St</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in players %}
+        <tr>
+          <td class="num rank">{{ loop.index }}</td>
+          <td class="name" title="{{ p.full_name }}">{{ p.name }}</td>
+          {{ stat_cells(p) }}
+          <td class="num">{{ '%.1f' % p.ep_next }}</td>
+          <td class="num">{{ '%.2f' % p.xpts_per_game }}</td>
+          <td class="num"><span class="fdr-pill fdr-{{ p.fdr_avg | round | int }}">{{ '%.1f' % p.fdr_avg }}</span></td>
+          <td class="num"><strong>{{ '%.1f' % p.score }}</strong></td>
+          <td class="status-cell">{{ flag_icon(p.status, p.news, p.chance) }}{% if p.crowd and p.crowd.availability not in ('unknown', 'fit') %}<span class="stat-icon crowd" title="Crowd intel: {{ p.crowd.availability }} — {{ p.crowd.reasons | join(' · ') }}">◆</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% if meta.excluded_crowd %}
+{# The crowd layer earning its keep: FPL still has these players fit, a source
+   the user follows does not. Naming them is the whole reason the layer exists. #}
+<div class="notice danger">
+  <strong>Left out on crowd intel, not on FPL's flags.</strong>
+  FPL still lists {{ 'them' if meta.excluded_crowd | length > 1 else 'him' }} as available:
+  {% for p in meta.excluded_crowd %}
+  <span class="cite" title="{{ p.crowd.reasons | join(' · ') }}">{{ p.name }} ({{ p.team }}) — reported {{ p.crowd.availability }}</span>{% if not loop.last %}, {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+
+<div class="page-head" id="creators">
+  <div>
+    <div class="eyebrow">Your creators</div>
+    <h1>Who they are saying to buy, sell, keep and captain</h1>
+  </div>
+  <span class="ticker-legend">
+    {% if board.run %}Read {{ board.run.run_at | fmt_time }} from {{ board.run.n_documents }} sources
+    {% else %}No crowd-intel run has landed yet{% endif %}
+  </span>
+</div>
+
+{% if not board.run %}
+<div class="panel"><div class="empty">
+  <h3>Nothing gathered yet</h3>
+  <p>The crowd-intel job reads your creators' latest videos and turns them into
+     structured intel. It has not completed a run — check the Gemini key and the
+     crowd stage in the logs.</p>
+</div></div>
+{% else %}
+
+<div class="notice">
+  <strong>The chip is a reading of the sentence, not a box the creator ticked.</strong>
+  The crowd layer stores one merged row per player, with each line naming the source that said it —
+  that prefix is the only per-creator attribution there is, and it carries no structured verdict.
+  So the chip below is derived from the creator's own wording, and their sentence is always printed
+  beside it. Where the wording does not commit either way it says <span class="verdict mention">mentioned</span>
+  rather than guessing.
+  {% if board.other_sources %}
+  Official FPL and the news feeds are excluded here — they are not creators and they already drive the
+  availability flags
+  ({% for s in board.other_sources %}{{ s.name }} {{ s.n }}{% if not loop.last %}, {% endif %}{% endfor %}).
+  {% endif %}
+</div>
+
+{% for c in board.creators %}
+<div class="panel">
+  <div class="panel-head">
+    <h2><span class="rank-badge" title="Trust rank {{ c.rank }} of {{ board.creators | length }}">{{ c.rank }}</span> {{ c.name }}</h2>
+    <span class="result-count">
+      {% if c.count %}{{ c.count }} player{{ '' if c.count == 1 else 's' }} · {{ c.transcripts or 0 }} transcript{{ '' if c.transcripts == 1 else 's' }} read
+      {% else %}nothing attributed in the last run{% endif %}
+    </span>
+  </div>
+  {% if not c.mentions %}
+  <div class="empty">
+    {% if c.state and c.state != 'ok' %}The last run could not read this channel ({{ c.state }}).
+    {% elif c.transcripts %}{{ c.transcripts }} transcript{{ '' if c.transcripts == 1 else 's' }} were read, but nothing in them named a player this app could resolve.
+    {% else %}No transcripts were read for this channel in the last run.{% endif %}
+  </div>
+  {% else %}
+  <div class="table-scroll">
+    <table data-sortable id="creator-{{ loop.index }}">
+      <thead>
+        <tr>
+          <th data-type="text" title="The player they were talking about, resolved to an FPL entry by fuzzy name match.">Player</th>
+          <th data-type="text" title="What their sentence amounts to, read off the wording. Captain beats everything, then buy and sell, then keep, then a minutes warning, then start. If nothing in the sentence commits, it says 'mentioned' — and if the player is flagged out, it says so.">Read as</th>
+          <th data-nosort title="Their own words, as the extraction step recorded them. This is the source of truth on the row; the chip beside it is only an index into it.">What they said</th>
+          {{ stat_headers('The next ' ~ (events | length) ~ ' gameweeks, earliest first.') }}
+          <th class="num" title="Crowd sentiment for this player across EVERY source in the run, −1 to +1 — not this creator's alone. Shown because a lone positive line reads differently when four other sources are negative.">All sources</th>
+          <th data-nosort title="Availability after the crowd layer has had its say.&#10;? doubtful · ✚ injured · ! suspended · ✕ unavailable · ◆ crowd intel">St</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in c.mentions %}
+        {% set p = m.player %}
+        <tr>
+          <td class="name" title="{{ p.full_name }}">{{ p.name }}<span class="pos" style="margin-left:5px">{{ p.position_name }}</span></td>
+          <td><span class="verdict {{ m.verdict }}">{{ m.verdict_label }}</span></td>
+          <td class="said">
+            {{ m.quote }}
+            {%- if m.role_change %}
+            {# Merged across sources like sentiment, so it is labelled rather
+               than left to read as part of the sentence above it. Worth showing
+               in full: "first choice penalty taker" is the kind of thing the
+               creators are watched for. #}
+            <span class="said-note" title="Recorded across every source in the run, not attributed to this creator.">all sources: {{ m.role_change }}</span>
+            {%- endif %}
+          </td>
+          {{ stat_cells(p) }}
+          {# Player-level, not this creator's: the crowd layer merges sentiment and
+             the role note across every source before storing them, so neither can
+             be attributed to one line. They live in this column, which says so. #}
+          <td class="num {% if m.sentiment > 0.15 %}good{% elif m.sentiment < -0.15 %}bad{% endif %}"
+              title="{{ m.n_sources }} source{{ '' if m.n_sources == 1 else 's' }}, confidence {{ '%.0f%%' % (m.confidence * 100) }}">{{ m.sentiment | signed(2) }}</td>
+          <td class="status-cell">{{ flag_icon(p.status, p.news, p.chance) }}{% if m.availability not in ('unknown', 'fit') %}<span class="stat-icon crowd" title="Crowd intel: {{ m.availability }}">◆</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% endif %}{# board.run #}
+{% endif %}{# events #}
+{% endblock %}

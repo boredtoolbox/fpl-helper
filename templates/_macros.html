@@ -1,0 +1,122 @@
+{# Shared building blocks. The fixture ticker is the signature element:
+   one cell per upcoming gameweek, coloured by FPL difficulty. #}
+
+{% macro ticker(fixtures, limit=6) -%}
+<span class="ticker">
+  {%- for f in fixtures[:limit] -%}
+    <span class="tick fdr-{{ f.difficulty or 3 }} {{ 'home' if f.home else 'away' }}"
+          title="GW{{ f.event or '' }} {% if f.home %}home to{% else %}away to{% endif %} {{ f.opp or f.opponent }} — difficulty {{ f.difficulty or '?' }}">
+      {{- (f.opp or f.opponent or '—') -}}
+    </span>
+  {%- endfor -%}
+</span>
+{%- endmacro %}
+
+{% macro ticker_legend() -%}
+<span class="ticker-legend">
+  FDR
+  {% for i in range(1, 6) %}<span class="swatch fdr-{{ i }}" style="background:var(--fdr-{{ i }})"></span>{% endfor %}
+  <span>easy → hard · 🏠 home · ✈️ away</span>
+</span>
+{%- endmacro %}
+
+{% macro flag(status, news, chance) -%}
+  {%- if status and status != 'a' -%}
+    <span class="flag-dot {{ status }}" title="{{ news }}"></span>
+    <span class="badge {% if status == 'd' %}warn{% else %}danger{% endif %}"
+          title="{{ news }}">{{ {'d':'doubt','i':'injured','s':'susp','u':'unavail','n':'n/a'}.get(status, status) }}{% if chance is not none %} {{ chance }}%{% endif %}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+
+{# Every page carries its own. A segmented control rather than a dropdown: with
+   a handful of entries the current team should be readable without opening
+   anything, and it still works with JavaScript off — each pill is a submit
+   button carrying its own team id. #}
+{% macro team_selector(entries, selected, note='') -%}
+{% if entries %}
+<form class="team-bar" method="get">
+  <span class="team-bar-key">Team</span>
+  <span class="team-pills">
+    {%- for entry in entries %}
+    <button type="submit" name="team" value="{{ entry.team_id }}"
+            class="team-pill{% if entry.team_id == selected %} on{% endif %}"
+            {% if entry.team_id == selected %}aria-current="true"{% endif %}
+            title="{{ entry.label }} — FPL entry {{ entry.team_id }}">
+      <span class="tp-name">{{ entry.label }}</span>
+      <span class="tp-id">{{ entry.team_id }}</span>
+    </button>
+    {%- endfor %}
+  </span>
+  {% if note %}<span class="team-bar-note">{{ note }}</span>{% endif %}
+</form>
+{% endif %}
+{%- endmacro %}
+
+
+{# Icon-only availability, for the explorer where 20 columns are competing for
+   width. Same information as `flag`, in ~16px: colour carries severity, the
+   glyph the reason, and the tooltip everything else. #}
+{% macro flag_icon(status, news, chance, show_fit=false) -%}
+  {%- if status and status != 'a' -%}
+    {%- set label = {'d':'Doubtful','i':'Injured','s':'Suspended','u':'Unavailable','n':'Not in squad'}.get(status, status) -%}
+    {%- set glyph = {'d':'?','i':'✚','s':'!','u':'✕','n':'✕'}.get(status, '!') -%}
+    <span class="stat-icon {{ status }}"
+          title="{{ label }}{% if chance is not none %} — {{ chance }}% chance of playing{% endif %}{% if news %} · {{ news }}{% endif %}">{{ glyph }}</span>
+  {%- elif show_fit -%}
+    <span class="stat-icon fit" title="Fit — no injury or availability news">✓</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{# The long run, for the Squad Builder: one cell per gameweek over ten of them
+   rather than six. Two differences from `ticker`, both of which only start to
+   matter once the run is long enough to contain them.
+
+   A gameweek the club does not play in gets a blank cell instead of being
+   skipped, so every run in a table lines up column for column — without it a
+   blank week silently pulls the next fixture left and the club looks like it
+   has more football than it has. A double gameweek puts both matches in the
+   same slot and marks them, which breaks that alignment on purpose: two cells
+   under one gameweek is the thing you want to notice. #}
+{% macro ticker_long(cells) -%}
+<span class="ticker ticker-long">
+  {%- for c in cells -%}
+    {%- if c.blank -%}
+      <span class="tick blank" title="GW{{ c.event }} — blank gameweek, no fixture">·</span>
+    {%- else -%}
+      <span class="tick fdr-{{ c.difficulty or 3 }} {{ 'home' if c.home else 'away' }}{% if c.double %} dgw{% endif %}"
+            title="GW{{ c.event }} {% if c.home %}home to{% else %}away to{% endif %} {{ c.opp_name }} — difficulty {{ c.difficulty or '?' }}{% if c.double %} (double gameweek){% endif %}">
+        {{- c.opp -}}
+      </span>
+    {%- endif -%}
+  {%- endfor -%}
+</span>
+{%- endmacro %}
+
+
+{# The seven figures every player on the Squad Builder is described by, as
+   header cells and as body cells. Kept together in one place because the whole
+   point of the page is that the shortlists and the creator tables describe a
+   player identically — two copies of this would drift apart on the first
+   edit. #}
+{% macro stat_headers(fixtures_label) -%}
+<th data-type="text" title="Club, by three-letter code.">Team</th>
+<th class="num" title="Current price: FPL's cost ÷ 10.">£m</th>
+<th data-nosort title="{{ fixtures_label }}&#10;Colour is FPL's own difficulty rating, 1 (easy) to 5 (hard). 🏠 home, ✈️ away.&#10;A · is a blank gameweek; two cells under one gameweek is a double.">Fixtures</th>
+<th class="num" title="FPL's points per game: total points ÷ matches appeared in.">PPG</th>
+<th class="num" title="Minutes ÷ matches appeared in. How long they last when they feature — a nailed 90 reads very differently from an hour off the bench.">Min/G</th>
+<th class="num" title="Expected goals ÷ matches appeared in, from FPL's xG model. How good the chances were, whether or not they were taken.">xG/G</th>
+<th class="num" title="Expected assists ÷ matches appeared in. How good the chances created were, whether or not they were converted.">xA/G</th>
+{%- endmacro %}
+
+{% macro stat_cells(p) -%}
+<td><span class="team-tag" title="{{ p.team_name }}">{{ p.team }}</span></td>
+<td class="num">{{ '%.1f' % p.price }}</td>
+<td>{{ ticker_long(p.fixtures) }}</td>
+<td class="num">{{ '%.1f' % p.ppg }}</td>
+{# All four rates divide by appearances, so a player who has never featured has
+   no denominator. A dash says that; a 0.00 would claim we measured something. #}
+<td class="num" data-sort="{{ p.mins_per_game }}">{% if p.games %}{{ '%.0f' % p.mins_per_game }}{% else %}<span class="miss">—</span>{% endif %}</td>
+<td class="num" data-sort="{{ p.xg_per_game }}">{% if p.games %}{{ '%.2f' % p.xg_per_game }}{% else %}<span class="miss">—</span>{% endif %}</td>
+<td class="num" data-sort="{{ p.xa_per_game }}">{% if p.games %}{{ '%.2f' % p.xa_per_game }}{% else %}<span class="miss">—</span>{% endif %}</td>
+{%- endmacro %}

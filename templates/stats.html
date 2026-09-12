@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% from "_macros.html" import team_selector %}
+{% block title %}My Stats · FPL Helper{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">My Stats</div>
+    <h1>{{ team.label if team else 'Points, ranks and leagues' }}</h1>
+  </div>
+</div>
+
+{{ team_selector(all_entries, selected_team_id) }}
+
+{% if no_config %}
+<div class="notice danger">
+  <strong>No team IDs configured.</strong>
+  Add your FPL entry IDs to <code>team_ids</code> in <code>config.yaml</code>, then run a refresh.
+</div>
+{% else %}
+<div class="panel">
+  <div class="panel-head">
+    <h2>Season summary</h2>
+    <span class="result-count">Entry {{ team.team_id }}</span>
+  </div>
+
+  {% if not team.entry %}
+  <div class="empty">
+    <h3>Nothing fetched for this team yet</h3>
+    <p>Run a refresh, and check the entry ID is correct in <code>config.yaml</code>.</p>
+  </div>
+  {% else %}
+  <div class="panel-body">
+    <div class="stat-row">
+      <div class="stat">
+        <span class="k">Overall points</span>
+        <span class="v">{{ team.totals.points if team.totals.points is not none else '—' }}</span>
+      </div>
+      <div class="stat">
+        <span class="k">Overall rank</span>
+        <span class="v">{{ team.totals.rank | fmt_rank }}</span>
+      </div>
+      <div class="stat">
+        <span class="k">Last GW</span>
+        <span class="v">{{ team.totals.event_points if team.totals.event_points is not none else '—' }}</span>
+        <span class="sub">rank {{ team.totals.event_rank | fmt_rank }}</span>
+      </div>
+      <div class="stat">
+        <span class="k">GW average</span>
+        <span class="v">{{ team.totals.average if team.totals.average is not none else '—' }}</span>
+        <span class="sub">{{ team.totals.played }} played</span>
+      </div>
+      <div class="stat">
+        <span class="k">Best GW</span>
+        <span class="v">{{ team.totals.best.points if team.totals.best else '—' }}</span>
+        <span class="sub">{% if team.totals.best %}GW{{ team.totals.best.event }}{% endif %}</span>
+      </div>
+      <div class="stat">
+        <span class="k">Points on bench</span>
+        <span class="v">{{ team.totals.bench_points }}</span>
+      </div>
+      <div class="stat">
+        <span class="k">Transfer hits</span>
+        <span class="v {% if team.totals.total_hits %}bad{% endif %}">−{{ team.totals.total_hits }}</span>
+      </div>
+    </div>
+  </div>
+
+  {% if team.history %}
+  <div class="panel-head" style="border-top:1px solid var(--line-soft)"><h3>Gameweek history</h3></div>
+  <div class="table-scroll">
+    <table data-sortable id="gw-{{ team.team_id }}">
+      <thead>
+        <tr>
+          <th class="num">GW</th>
+          <th class="num">Points</th>
+          <th class="num">Total</th>
+          <th class="num">GW rank</th>
+          <th class="num">Overall rank</th>
+          <th class="num">Transfers</th>
+          <th class="num">Hit</th>
+          <th class="num">Bench</th>
+          <th class="num">Value</th>
+          <th class="num">Bank</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in team.history | reverse %}
+        <tr>
+          <td class="num">{{ h.event }}</td>
+          <td class="num"><strong>{{ h.points }}</strong></td>
+          <td class="num">{{ h.total_points }}</td>
+          <td class="num">{{ h.rank | fmt_rank }}</td>
+          <td class="num">{{ h.overall_rank | fmt_rank }}</td>
+          <td class="num">{{ h.event_transfers }}</td>
+          <td class="num {% if h.event_transfers_cost %}bad{% endif %}">{{ '−%d' % h.event_transfers_cost if h.event_transfers_cost else '—' }}</td>
+          <td class="num">{{ h.points_on_bench }}</td>
+          <td class="num">{{ '%.1f' % ((h.value or 0) / 10) }}</td>
+          <td class="num">{{ '%.1f' % ((h.bank or 0) / 10) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty" style="padding:22px 20px">
+    <p>No gameweeks played yet this season. Points and ranks appear once GW1 is scored.</p>
+  </div>
+  {% endif %}
+
+  {% set has_standings = team.leagues | selectattr('rank') | list | length > 0 %}
+  <div class="panel-head" style="border-top:1px solid var(--line-soft)">
+    <h3>Classic leagues</h3>
+    <span class="result-count">{{ team.leagues | length }} joined</span>
+  </div>
+  {% if team.leagues and not has_standings %}
+  <div class="panel-body" style="padding-bottom:0">
+    <p class="plan-note" style="margin:0">
+      FPL doesn't publish league standings until a gameweek has been scored, so ranks
+      are empty for now. They'll fill in after GW1.
+    </p>
+  </div>
+  {% endif %}
+  {% if team.leagues %}
+  <div class="table-scroll">
+    <table data-sortable id="lg-{{ team.team_id }}">
+      <thead>
+        <tr>
+          <th data-type="text">League</th>
+          <th class="num">Rank</th>
+          <th class="num">Move</th>
+          <th class="num">Entries</th>
+          <th class="num">Top %</th>
+          <th class="num">Total pts</th>
+          <th class="num">Last GW</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lg in team.leagues %}
+        <tr>
+          <td class="name">{{ lg.name }}</td>
+          <td class="num">{{ lg.rank | fmt_rank }}</td>
+          <td class="num {% if lg.movement and lg.movement > 0 %}good{% elif lg.movement and lg.movement < 0 %}bad{% endif %}">
+            {{ ('%+d' % lg.movement) if lg.movement else '—' }}
+          </td>
+          <td class="num">{{ lg.num_entries | fmt_rank }}</td>
+          <td class="num">{{ ('%.1f%%' % lg.percentile) if lg.percentile else '—' }}</td>
+          <td class="num">{{ lg.total if lg.total is not none else '—' }}</td>
+          <td class="num">{{ lg.event_total if lg.event_total is not none else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><p>No classic leagues found. Run a refresh to fetch them.</p></div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

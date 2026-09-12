@@ -1,0 +1,1510 @@
+/* ==========================================================================
+   FPL Helper — floodlit slate.
+
+   The palette is still derived from FPL's own fixture-difficulty scale, because
+   that is the colour language managers already read fixtures in. Everything
+   structural stays quiet so the FDR greens and reds carry the meaning.
+
+   Two accents, and the split between them is deliberate:
+     * amber   — interaction and status. The captain's armband, the active nav
+                 item, focus rings, the live dot. Nothing decorative.
+     * indigo  — decoration only. The wordmark, section eyebrows, the ambient
+                 glow behind the header, row hover. It never means anything, so
+                 it can never be confused with a difficulty or a warning.
+
+   Every tint in this file is expressed as rgba(var(--x-rgb), a) rather than a
+   literal, so a colour and the fifteen washes derived from it cannot drift
+   apart when one of them is edited.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Ground. Deeper and slightly bluer than the first cut, which sat at #0f1720
+     and read as grey: the FDR colours have more to push against down here. */
+  --ink-900: #090d14;
+  --ink-850: #0d121b;   --ink-850-rgb: 13,18,27;
+  --ink-800: #111823;
+  --ink-750: #18202c;
+  --ink-700: #212b3a;
+  --line:      #2c3a4b;
+  --line-soft: #1c2533;
+
+  /* Text */
+  --text:   #eef3f9;
+  --text-2: #c3d2e0;
+  --muted:  #8ea3b8;
+  --faint:  #5f7488;   --faint-rgb: 95,116,136;
+
+  /* Fixture difficulty — the semantic core */
+  --fdr-1: #12c98d;    --fdr-1-rgb: 18,201,141;
+  --fdr-2: #58d7a8;    --fdr-2-rgb: 88,215,168;
+  --fdr-3: #5c6f86;    --fdr-3-rgb: 92,111,134;
+  --fdr-4: #f4714f;    --fdr-4-rgb: 244,113,79;
+  --fdr-5: #dc2f4f;    --fdr-5-rgb: 220,47,79;
+
+  /* Signals. --bad is the same colour as a difficulty-4 fixture on purpose:
+     "this is going badly" should look the same wherever it is said. */
+  --accent: #ffb527;       --accent-rgb: 255,181,39;
+  --accent-hi: #ffc95c;    /* the lit edge of an amber surface */
+  --accent-dim: #b57c12;
+  --accent-2: #8b93ff;     --accent-2-rgb: 139,147,255;   /* decorative only */
+  --good: #2ed296;    --good-rgb: 46,210,150;
+  --bad:  #f4714f;    --bad-rgb: 244,113,79;
+  --warn: #ffb527;    --warn-rgb: 255,181,39;
+
+  /* Text sitting ON a tint of the colour above. Lightened well past the source
+     so it still clears contrast against a 15%-opacity wash of itself. */
+  --good-text: #7ff0c2;
+  --warn-text: #ffd479;
+  --bad-text:  #ffa78f;
+  /* Text sitting on a FULLY saturated signal colour. */
+  --on-bright: #08101a;
+
+  --radius: 5px;
+  --radius-lg: 9px;
+
+  /* Depth. Two levels only — resting and lifted. */
+  --shadow:    0 1px 2px rgba(0,0,0,0.40), 0 4px 14px rgba(0,0,0,0.26);
+  --shadow-lg: 0 2px 6px rgba(0,0,0,0.45), 0 16px 38px rgba(0,0,0,0.40);
+  --ring: 0 0 0 3px rgba(255,181,39,0.20);
+  /* The lit top edge that makes a flat panel read as a surface. */
+  --edge: rgba(255,255,255,0.08);
+
+  --font-display: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  /* Two soft pools of light behind the header, one per accent. They are what
+     stops the page reading as a flat rectangle of slate before a single
+     component has drawn. No background-attachment: fixed — that repaints on
+     every scroll frame, and this only has to work at the top of the page. */
+  background:
+    radial-gradient(900px 440px at 10% -10%, rgba(var(--accent-rgb), 0.05), transparent 70%),
+    radial-gradient(820px 400px at 88% -14%, rgba(var(--accent-2-rgb), 0.08), transparent 70%),
+    var(--ink-900);
+  background-repeat: no-repeat;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+h1 { font-size: 1.6rem; letter-spacing: -0.025em; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 0.95rem; }
+
+a { color: var(--text); text-decoration: none; transition: color 0.15s ease; }
+a:hover { color: var(--accent); }
+
+::selection { background: rgba(var(--accent-rgb), 0.28); color: var(--text); }
+
+/* Scrollbars, which on a dark page are otherwise a bright strip down the side
+   of every table. */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--faint); background-clip: padding-box; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+/* --- Layout ------------------------------------------------------------- */
+.wrap { max-width: 1500px; margin: 0 auto; padding: 0 20px; }
+
+.topbar {
+  border-bottom: 1px solid var(--line-soft);
+  /* Translucent so the page slides under it rather than vanishing behind a
+     bar. The solid colour is declared first as the fallback: without blur
+     support this is just an opaque header, which is what it was before. */
+  background: var(--ink-850);
+  background: rgba(var(--ink-850-rgb), 0.78);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow: 0 1px 0 var(--edge), 0 10px 30px rgba(0,0,0,0.35);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+/* The wordmark runs from text to amber. Guarded, because without
+   background-clip the transparent fill would leave it invisible rather than
+   merely unstyled. Both children set their own colour, so they paint over the
+   clipped gradient and are unaffected. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .brand {
+    background-image: linear-gradient(96deg, var(--text) 30%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+.brand .brand-mark { color: var(--accent); text-shadow: 0 0 14px rgba(var(--accent-rgb), 0.55); }
+.brand .brand-gw {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  background: rgba(var(--accent-2-rgb), 0.10);
+  border: 1px solid rgba(var(--accent-2-rgb), 0.28);
+  border-radius: 99px;
+  padding: 1px 8px;
+}
+
+nav.pages { display: flex; gap: 2px; flex-wrap: wrap; }
+nav.pages a {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+}
+nav.pages a { transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease; }
+nav.pages a:hover { background: var(--ink-700); color: var(--text); }
+nav.pages a.active {
+  color: var(--accent);
+  border-color: rgba(var(--accent-rgb), 0.42);
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.17), rgba(var(--accent-rgb), 0.06));
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb), 0.14);
+}
+
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+/* --- Controls ----------------------------------------------------------- */
+select, input[type="search"], input[type="text"], input[type="number"], button {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--ink-750);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 5px 9px;
+  transition: border-color 0.15s ease, background 0.15s ease,
+              color 0.15s ease, box-shadow 0.15s ease;
+}
+select:hover, input:hover { border-color: var(--faint); background: var(--ink-700); }
+/* The field itself picks up the accent on focus. The global :focus-visible
+   outline still draws on top for keyboard users — this is the resting state of
+   a field you are typing in, not a replacement for that. */
+select:focus, input:focus { border-color: var(--accent); background: var(--ink-700); }
+button { cursor: pointer; font-weight: 500; }
+button:hover { border-color: var(--accent); color: var(--accent); box-shadow: var(--ring); }
+button[disabled] { opacity: 0.5; cursor: not-allowed; }
+button[disabled]:hover { border-color: var(--line); color: var(--text); box-shadow: none; }
+
+.btn-accent {
+  background: linear-gradient(180deg, var(--accent-hi), var(--accent));
+  color: var(--on-bright);
+  border-color: rgba(var(--accent-rgb), 0.85);
+  font-weight: 600;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.28) inset,
+              0 4px 14px rgba(var(--accent-rgb), 0.22);
+}
+.btn-accent:hover {
+  background: linear-gradient(180deg, #ffd57a, var(--accent-hi));
+  color: var(--on-bright);
+  border-color: var(--accent);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.32) inset,
+              0 6px 20px rgba(var(--accent-rgb), 0.34);
+}
+
+label.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* --- Page header -------------------------------------------------------- */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 22px 0 14px;
+}
+.page-head .eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent-2);
+  margin-bottom: 5px;
+}
+
+/* --- Panels ------------------------------------------------------------- */
+.panel {
+  position: relative;
+  background: linear-gradient(180deg, var(--ink-800), var(--ink-850));
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+  /* Clips whatever sits in the corners — a bench strip, a hovered last row —
+     to the panel's own radius. Safe for the sticky table headers: their scroll
+     container is .table-scroll inside this, not the panel itself. */
+  overflow: hidden;
+}
+/* A one-pixel highlight along the top edge. This, and nothing else, is what
+   makes a flat surface read as lit from above. */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--edge) 15%, var(--edge) 85%, transparent);
+  pointer-events: none;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 11px 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.022), transparent);
+  border-bottom: 1px solid var(--line-soft);
+}
+.panel-head h2, .panel-head h3 { margin: 0; }
+.panel-body { padding: 14px; }
+.panel-body.flush { padding: 0; }
+
+.grid { display: grid; gap: 18px; }
+.grid-2 { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+/* --- Stat tiles --------------------------------------------------------- */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1px;
+  background: var(--line-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.stat {
+  background: linear-gradient(180deg, var(--ink-800), var(--ink-850));
+  padding: 12px 14px;
+}
+.stat .k {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 3px;
+}
+.stat .v {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.stat .sub { font-size: 0.72rem; color: var(--faint); }
+
+/* --- Tables ------------------------------------------------------------- */
+.table-scroll { overflow-x: auto; }
+/* A wide table's horizontal scrollbar sits at the bottom of the table, which on
+   the 650-row explorer meant scrolling the whole page to reach it. Capping the
+   height puts the bar at the foot of the viewport instead, and the sticky header
+   keeps working because it sticks to this box rather than the page. */
+.table-scroll.fill {
+  overflow: auto;
+  max-height: calc(100vh - 60px);
+  overscroll-behavior: contain;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+thead th {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, var(--ink-750), var(--ink-800));
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-align: left;
+  padding: 8px 8px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  z-index: 2;
+}
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th.sortable::after {
+  content: '';
+  display: inline-block;
+  width: 0.45em;
+  color: var(--faint);
+}
+th.sort-asc::after  { content: '▲'; color: var(--accent); font-size: 0.6em; }
+th.sort-desc::after { content: '▼'; color: var(--accent); font-size: 0.6em; }
+
+tbody td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  white-space: nowrap;
+}
+/* Hover in the decorative accent, not a grey lift: it is the one row-wide
+   colour on the page that cannot be mistaken for a difficulty or a band. */
+tbody tr { transition: background 0.12s ease; }
+tbody tr:hover { background: rgba(var(--accent-2-rgb), 0.07); }
+tbody tr:last-child td { border-bottom: 0; }
+
+td.num, th.num { text-align: right; font-family: var(--font-mono); }
+td.name { font-weight: 500; white-space: nowrap; }
+.pos {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 4px;
+}
+.team-tag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-2);
+  letter-spacing: 0.04em;
+}
+
+.good { color: var(--good); }
+.bad  { color: var(--bad); }
+.hit  { color: var(--good); font-weight: 600; }
+
+/* Player-explorer bands. A tint rather than coloured text alone: the point is
+   to read a whole column at a glance, and text colour on its own is too thin at
+   this size to pick out a block of good numbers from a block of poor ones. */
+.b-good { color: var(--good-text); background: rgba(var(--good-rgb),0.14); }
+.b-avg  { color: var(--warn-text); background: rgba(var(--accent-rgb),0.10); }
+.b-bad  { color: var(--bad-text); background: rgba(var(--bad-rgb),0.11); }
+/* Not enough football behind the number to grade it. Deliberately the same
+   slate as a neutral-difficulty fixture in the ticker, so it reads as "no
+   verdict" rather than as a quiet fourth opinion on the player. */
+.b-thin { color: var(--muted); background: rgba(var(--faint-rgb),0.20); }
+tbody tr:hover .b-thin { background: rgba(var(--faint-rgb),0.30); }
+
+tbody tr:hover .b-good { background: rgba(var(--good-rgb),0.22); }
+tbody tr:hover .b-avg  { background: rgba(var(--accent-rgb),0.18); }
+tbody tr:hover .b-bad  { background: rgba(var(--bad-rgb),0.19); }
+
+/* Legend chips in the notice above the table. */
+.band-key { display: inline-flex; gap: 6px; margin-right: 8px; vertical-align: middle; }
+.band-key .chip {
+  padding: 1px 7px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.miss { color: var(--muted); }
+
+
+/* --- The signature: fixture ticker -------------------------------------- */
+/* Six cells, one per upcoming gameweek, coloured by FPL difficulty. This is
+   the thing you actually scan when deciding who to bring in. */
+.ticker { display: inline-flex; gap: 2px; vertical-align: middle; }
+.tick {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  min-width: 30px;
+  padding: 2px 3px;
+  text-align: center;
+  border-radius: 3px;
+  color: var(--on-bright);
+  position: relative;
+  /* A hairline of light along the top of each cell. At this size it is the
+     difference between a row of flat swatches and a row of objects. */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.16);
+}
+/* Venue is stated with an icon now rather than implied by italics, and drawn
+   from the class so the glyph is not repeated through four thousand cells of
+   markup. Kept small and slightly dimmed so it marks the cell without competing
+   with the opponent code, which is what you are actually reading. */
+.tick::before {
+  font-size: 0.82em;
+  margin-right: 1px;
+  opacity: 0.9;
+  letter-spacing: 0;
+}
+.tick.home::before { content: '🏠'; }
+.tick.away::before { content: '✈️'; }
+.fdr-1 { background: var(--fdr-1); }
+.fdr-2 { background: var(--fdr-2); }
+.fdr-3 { background: var(--fdr-3); color: var(--text); }
+.fdr-4 { background: var(--fdr-4); }
+.fdr-5 { background: var(--fdr-5); color: #ffeef1; }
+
+/* Ten cells instead of six, so each has to give up some width. Small enough
+   that a full run fits beside the numbers, still wide enough for a three-letter
+   club code. */
+.ticker-long .tick { min-width: 25px; font-size: 0.57rem; padding: 2px; }
+.ticker-long .tick::before { font-size: 0.72em; margin-right: 0; }
+/* A gameweek the club does not play in. Deliberately hollow rather than a sixth
+   colour: a blank is the absence of a fixture, not a difficulty. */
+.tick.blank {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--faint);
+  box-shadow: none;
+}
+/* Two matches in one gameweek. The runs stop lining up at this point, which is
+   the whole reason to mark it. */
+.tick.dgw { box-shadow: inset 0 -2px 0 var(--accent); }
+
+.ticker-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+.ticker-legend .swatch {
+  width: 15px; height: 9px; border-radius: 2px; display: inline-block;
+}
+
+/* --- Pitch -------------------------------------------------------------- */
+.pitch {
+  padding: 14px;
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(var(--fdr-1-rgb),0.07), transparent 60%),
+    var(--ink-800);
+}
+
+/* One band per line. The label and the rule are what separate a back four from
+   a midfield three — without them the pitch is just three rows of cards and you
+   have to read the names to work out the shape. */
+.pitch-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line-soft);
+}
+.pitch-line:last-child { border-bottom: 0; }
+.line-label {
+  flex: 0 0 54px;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.line-count {
+  font-size: 0.9em;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.pitch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  flex: 1;
+}
+
+.shirt {
+  position: relative;
+  width: 118px;
+  padding: 8px 8px 7px;
+  background: linear-gradient(180deg, var(--ink-800), var(--ink-850));
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--fdr-3);
+  border-radius: var(--radius);
+  text-align: center;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+/* The pitch is the one place on the site that is looked at rather than read,
+   so it is the one place a card lifts under the pointer. */
+.shirt:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.shirt.fdr-edge-1 { border-left-color: var(--fdr-1); }
+.shirt.fdr-edge-2 { border-left-color: var(--fdr-2); }
+.shirt.fdr-edge-3 { border-left-color: var(--fdr-3); }
+.shirt.fdr-edge-4 { border-left-color: var(--fdr-4); }
+.shirt.fdr-edge-5 { border-left-color: var(--fdr-5); }
+
+/* The real FPL shirt, cached locally by the refresh job. */
+.shirt .kit {
+  display: block;
+  margin: 0 auto 5px;
+  width: 44px;
+  height: auto;
+  image-rendering: -webkit-optimize-contrast;
+}
+.shirt.bench .kit { width: 34px; }
+/* Shown until the refresh has fetched the kits, so the card keeps its shape. */
+.kit-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 5px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--faint);
+}
+.shirt.bench .kit-missing { width: 34px; height: 34px; }
+
+.shirt .sname {
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.shirt .smeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--muted);
+}
+.shirt .opp-mark { color: var(--text-2); font-weight: 600; }
+
+/* Where they are playing, on the starting XI cards. Deliberately the same two
+   glyphs the fixture ticker uses: a venue should look the same everywhere it is
+   stated, and these are already the ones the reader has learned. */
+.shirt .venue {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.shirt .venue::before { font-size: 0.92em; opacity: 0.9; letter-spacing: 0; }
+.shirt .venue.home::before { content: '🏠'; }
+.shirt .venue.away::before { content: '✈️'; }
+/* A blank gameweek: no fixture, so no venue to state. */
+.shirt .venue.none { color: var(--muted); font-weight: 400; }
+
+/* What the player actually scored, top-right, opposite the armband. */
+.gw-pts {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  min-width: 19px;
+  padding: 1px 4px;
+  border-radius: var(--radius);
+  background: var(--ink-700);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+/* A gameweek being played right now. The global reduced-motion rule already
+   stills the pulse, leaving a plain dot. */
+.live { color: var(--warn); display: inline-flex; align-items: center; gap: 6px; }
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.6);
+  animation: live-pulse 2s ease-out infinite;
+  flex: 0 0 7px;
+}
+@keyframes live-pulse {
+  70%  { box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0); }
+}
+.stat .v.live { font-size: 1rem; }
+.stat .v.miss { color: var(--muted); }
+
+.gw-pts.hot  { background: rgba(var(--good-rgb),0.18); border-color: rgba(var(--good-rgb),0.5); color: var(--good-text); }
+.gw-pts.cold { background: rgba(var(--bad-rgb),0.13); border-color: rgba(var(--bad-rgb),0.4); color: var(--bad-text); }
+
+.armband {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 17px;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--accent-hi), var(--accent));
+  color: var(--on-bright);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.16),
+              0 2px 10px rgba(var(--accent-rgb), 0.4);
+}
+.armband.vice {
+  background: var(--ink-700);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.18);
+}
+
+.bench-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--ink-850);
+}
+.bench-strip .bench-label {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex: 0 0 54px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.shirt.bench { width: 104px; padding: 7px 6px 6px; }
+.bench-order {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--faint);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 0 3px;
+  margin-right: 4px;
+}
+
+.badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.badge.ok      { color: var(--good); border-color: rgba(var(--good-rgb),0.4); }
+.badge.warn    { color: var(--warn); border-color: rgba(var(--accent-rgb),0.4); }
+.badge.danger  { color: var(--bad);  border-color: rgba(var(--bad-rgb),0.45); }
+.badge.accent  { color: var(--accent); border-color: var(--accent-dim); }
+
+/* Availability in one glyph, for the explorer. Colour carries severity, the
+   glyph the reason, and the tooltip the news text and chance of playing. */
+.stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: help;
+}
+.stat-icon + .stat-icon { margin-left: 3px; }
+.stat-icon.d { background: rgba(var(--accent-rgb),0.18); color: var(--warn); border: 1px solid rgba(var(--accent-rgb),0.45); }
+.stat-icon.i,
+.stat-icon.s,
+.stat-icon.u,
+.stat-icon.n { background: rgba(var(--bad-rgb),0.16); color: var(--bad); border: 1px solid rgba(var(--bad-rgb),0.45); }
+.stat-icon.fit { background: rgba(var(--good-rgb),0.13); color: var(--good); border: 1px solid rgba(var(--good-rgb),0.38); }
+.stat-icon.crowd {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  font-size: 0.55rem;
+}
+.status-cell { text-align: center; }
+
+.flag-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.flag-dot.d { background: var(--warn); }
+.flag-dot.i, .flag-dot.s, .flag-dot.u, .flag-dot.n { background: var(--bad); }
+
+/* Small print under a table cell or panel. */
+.plan-note { font-size: 0.76rem; color: var(--muted); }
+
+/* --- Team selector ------------------------------------------------------
+   On every page, directly under its heading. It used to sit in the top bar on
+   two pages only, which made "which squad am I looking at?" a question you had
+   to answer by looking somewhere else — and left the explorer with no answer at
+   all. A segmented control rather than a dropdown: with a handful of entries the
+   current team should be legible without opening anything. */
+.team-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+  padding: 9px 12px;
+  background: linear-gradient(180deg, var(--ink-800), var(--ink-850));
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+.team-bar-key {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+}
+.team-pills { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.team-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  font-weight: 500;
+}
+.team-pill:hover { background: var(--ink-700); color: var(--text); border-color: var(--faint); }
+.team-pill .tp-id {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--faint);
+  letter-spacing: 0.04em;
+}
+/* The selected team carries the accent, the same one the armband and the active
+   nav item use — one colour meaning "this is the thing in focus". */
+.team-pill { transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+.team-pill.on {
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.18), rgba(var(--accent-rgb), 0.07));
+  border-color: rgba(var(--accent-rgb), 0.45);
+  color: var(--accent);
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb), 0.15);
+}
+.team-pill.on:hover { color: var(--accent); border-color: var(--accent); }
+.team-pill.on .tp-id { color: var(--accent-dim); }
+.team-bar-note { font-size: 0.74rem; color: var(--faint); margin-left: auto; }
+
+/* --- Expandable per-opponent history ------------------------------------
+   A caret in the name cell opens a panel spanning the table: the club's recent
+   results against each of the next six opponents, then the player's own record
+   in those games. */
+/* Sized and bordered like the button it is. The first cut drew a 10px glyph in
+   --faint with no box around it, which read as punctuation attached to the name
+   rather than as something you could click. */
+.caret {
+  width: 19px;
+  height: 19px;
+  padding: 0;
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  background: var(--ink-750);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: transform 0.15s ease, color 0.15s ease,
+              background 0.15s ease, border-color 0.15s ease;
+}
+.caret:hover { color: var(--accent); border-color: var(--accent); background: var(--ink-700); }
+/* Open reads as filled rather than outlined, so a row you have expanded is
+   obvious when several are. */
+.caret[aria-expanded="true"] {
+  color: var(--ink-900);
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: rotate(180deg);
+}
+.caret-key {
+  color: var(--text-2);
+  background: var(--ink-750);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 4px;
+  font-size: 0.72rem;
+}
+tr.expanded { background: var(--ink-750); }
+tr.expanded td { border-bottom-color: transparent; }
+
+.detail-row > td { padding: 0; background: var(--ink-850); white-space: normal; }
+tbody tr.detail-row:hover { background: var(--ink-850); }
+.detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+  gap: 1px;
+  background: var(--line-soft);
+  border-top: 1px solid var(--accent-dim);
+}
+.detail.is-loading {
+  display: block;
+  padding: 14px 16px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  background: var(--ink-850);
+}
+.detail-block { background: var(--ink-850); padding: 12px 14px 14px; }
+.detail-title {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-2);
+  margin: 0 0 9px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.detail-note { text-transform: none; letter-spacing: 0.02em; color: var(--faint); font-weight: 400; }
+
+.opp-list { display: flex; flex-direction: column; gap: 5px; }
+.opp-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.opp-fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 92px;
+}
+.opp-gw {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--faint);
+  letter-spacing: 0.04em;
+}
+.opp-runs { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+
+/* One past meeting. Result first because that is what the eye is scanning for,
+   the scoreline after it for the detail. */
+.meet {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 2px 7px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.meet b { font-weight: 600; margin-right: 2px; }
+.meet.win  { background: rgba(var(--good-rgb),0.14); color: var(--good-text); border-color: rgba(var(--good-rgb),0.28); }
+.meet.draw { background: rgba(var(--faint-rgb),0.22); color: var(--text-2); border-color: rgba(var(--faint-rgb),0.35); }
+.meet.loss { background: rgba(var(--bad-rgb),0.13); color: var(--bad-text); border-color: rgba(var(--bad-rgb),0.3); }
+.meet.none {
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  color: var(--faint);
+  font-style: italic;
+  padding-left: 0;
+}
+
+/* One past appearance: minutes, then the three returns that were asked for. */
+.perf {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--ink-800);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+.perf .pf-min { color: var(--faint); }
+.perf .pf { color: var(--muted); }
+/* Anything that actually returned. A goal, an assist, or a defensive shift that
+   cleared this position's DefCon threshold and banked the two points. */
+.perf .pf.on { color: var(--accent); font-weight: 600; }
+
+/* --- Sub-tabs ------------------------------------------------------------
+   Alternative answers to one question, so they sit inside the panel rather
+   than up with the page navigation. No page uses them at present — the one that
+   did has gone — but `initTabs` in app.js still ships, so this is the styling a
+   new set would pick up. */
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.tab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 7px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 500;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); background: var(--ink-800); border-color: transparent; }
+.tab.on {
+  color: var(--accent);
+  background: var(--ink-800);
+  border-color: var(--line);
+  border-bottom: 1px solid var(--ink-800);
+}
+.tab .tab-note {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--faint);
+}
+.tab.on .tab-note { color: var(--accent-dim); }
+.tab-panel[hidden] { display: none; }
+
+/* --- Notices ------------------------------------------------------------ */
+.notice {
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--accent);
+  background:
+    linear-gradient(90deg, rgba(var(--accent-rgb), 0.07), transparent 38%),
+    var(--ink-800);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  box-shadow: var(--shadow);
+}
+.notice.danger {
+  border-left-color: var(--bad);
+  background:
+    linear-gradient(90deg, rgba(var(--bad-rgb), 0.08), transparent 38%),
+    var(--ink-800);
+}
+.notice strong { color: var(--text); }
+.notice code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--ink-700);
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: var(--accent);
+}
+
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.empty h3 { color: var(--text-2); margin-bottom: 6px; }
+
+/* --- Filter bar --------------------------------------------------------- */
+.filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.filters .spacer { flex: 1; }
+.result-count {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* --- Footer ------------------------------------------------------------- */
+footer.foot {
+  border-top: 1px solid var(--line-soft);
+  margin-top: 30px;
+  padding: 16px 0 30px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--faint);
+  letter-spacing: 0.03em;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+footer.foot .fresh-ok { color: var(--good); }
+footer.foot .fresh-stale { color: var(--warn); }
+footer.foot .fresh-fail { color: var(--bad); }
+
+/* --- Flash messages ----------------------------------------------------- */
+.flashes { list-style: none; margin: 14px 0 0; padding: 0; }
+.flashes li {
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--accent);
+  background:
+    linear-gradient(90deg, rgba(var(--accent-rgb), 0.07), transparent 38%),
+    var(--ink-800);
+  box-shadow: var(--shadow);
+  padding: 9px 13px;
+  border-radius: var(--radius);
+  margin-bottom: 7px;
+  font-size: 0.82rem;
+}
+
+/* --- Squad Builder ------------------------------------------------------ */
+/* Rank column on the shortlists and the creator strip. Quiet on purpose: the
+   order is already the order the rows are in, so the number only has to confirm
+   it, not announce it. */
+td.rank { color: var(--faint); font-size: 0.75rem; width: 1%; }
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--ink-750);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+/* Average difficulty over the run, on the same colour scale as the individual
+   cells so the summary and the detail read as one thing. */
+.fdr-pill {
+  display: inline-block;
+  min-width: 30px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--on-bright);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.16);
+}
+
+/* What a creator's line amounts to. Colour carries the direction — green for
+   the calls that put a player in your team, red for the ones that take him out,
+   slate for "they talked about him and did not commit" — so a creator's column
+   can be scanned without reading a word of it. */
+.verdict {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 2px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.verdict.captain { background: var(--accent); color: var(--ink-900); }
+.verdict.buy     { background: rgba(var(--good-rgb),0.18); color: var(--good-text); border-color: rgba(var(--good-rgb),0.4); }
+.verdict.start   { background: rgba(var(--good-rgb),0.12); color: var(--good-text); border-color: rgba(var(--good-rgb),0.25); }
+.verdict.keep    { background: rgba(var(--fdr-2-rgb),0.10); color: var(--good-text); border-color: rgba(var(--fdr-2-rgb),0.28); }
+.verdict.sell    { background: rgba(var(--bad-rgb),0.18); color: var(--bad-text); border-color: rgba(var(--bad-rgb),0.4); }
+.verdict.out     { background: rgba(var(--fdr-5-rgb),0.22); color: var(--bad-text); border-color: rgba(var(--fdr-5-rgb),0.5); }
+.verdict.risk,
+.verdict.doubt   { background: rgba(var(--accent-rgb),0.14); color: var(--warn-text); border-color: rgba(var(--accent-rgb),0.35); }
+.verdict.mention { background: rgba(var(--faint-rgb),0.20); color: var(--muted); border-color: var(--line-soft); }
+
+/* The creator's own sentence. The one cell on the page allowed to wrap — it is
+   prose, and truncating it would hide the thing the row exists to show. */
+td.said {
+  white-space: normal;
+  max-width: 360px;
+  min-width: 220px;
+  color: var(--text-2);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+/* The player-level note under a creator's sentence. Set apart on its own line
+   because it did not come from them. */
+.said-note {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+/* An inline attribution or aside inside running text. */
+.cite {
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  color: var(--muted);
+  border-bottom: 1px dotted var(--line);
+}
+
+/* --- Matches ------------------------------------------------------------ */
+/* A fixture is a symmetrical thing — two teams either side of a score — so it
+   is laid out that way rather than as a table row. The grid is the same before
+   and after kickoff; only what sits in the middle column changes. */
+.match {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.match:last-child { border-bottom: 0; }
+.match:hover { background: rgba(var(--accent-2-rgb), 0.05); }
+
+.m-side { display: flex; align-items: center; gap: 9px; min-width: 0; }
+
+/* The club crest. Fixed box so a tall badge and a wide one occupy the same
+   space and the score column stays on the centre line down the whole list. */
+.crest {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+/* Until the refresh has fetched one. Same footprint, so the row does not move
+   when the images arrive. */
+.crest-missing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  font-weight: 600;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+.m-side.home { justify-content: flex-end; }
+.m-side.away { justify-content: flex-start; }
+.m-team {
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The winner, marked once. Not colour — a result is not good or bad, it just
+   went one way, and the FDR scale already owns green and red on this page. */
+.m-team.won { font-weight: 700; color: var(--text); }
+.m-side.home .m-team { text-align: right; }
+
+.m-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 108px;
+}
+.m-kick {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.m-score {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.m-score i { color: var(--faint); font-style: normal; font-weight: 400; }
+.m-state {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.m-state.live { color: var(--warn); display: inline-flex; align-items: center; gap: 5px; }
+
+/* Who did what, under the score and aligned outward from it, so each team's
+   returns sit under that team's name. */
+.m-detail {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 14px;
+  align-items: start;
+  margin-top: 7px;
+}
+.m-rule { background: var(--line-soft); }
+.m-returns { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.m-returns.right { justify-content: flex-end; }
+.m-returns.left { justify-content: flex-start; }
+
+.ret {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.ret-icon { font-size: 0.82em; opacity: 0.85; }
+/* Assists get a drawn badge rather than an emoji: the squared-A character is
+   missing from enough fonts to render as tofu, and a letter cannot fail. */
+.assist-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--muted);
+  opacity: 1;
+}
+.ret.assist { color: var(--muted); }
+.ret.card { color: var(--faint); font-size: 0.72rem; }
+/* An own goal counted for the other side, so it is listed there — dimmed and
+   labelled, because it is not the scorer's achievement. */
+.ret.goal.og { color: var(--muted); }
+.ret-og {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--faint);
+  text-transform: uppercase;
+}
+
+/* One gameweek's worth of fixtures, headed so a long list stays navigable. */
+.match-group { border-bottom: 1px solid var(--line); }
+.match-group:last-child { border-bottom: 0; }
+.mg-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 16px;
+  background: rgba(var(--accent-2-rgb), 0.05);
+  border-bottom: 1px solid var(--line-soft);
+}
+.mg-gw {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+.mg-note { font-family: var(--font-mono); font-size: 0.68rem; color: var(--faint); }
+
+/* --- Matchweek navigation ------------------------------------------------
+   A step either side, every matchweek between them. The strip scrolls rather
+   than wraps, so the bar stays one line tall at any window width and the season
+   reads as a single timeline instead of a paragraph of numbers. */
+.mw-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 7px 8px;
+  background: linear-gradient(180deg, var(--ink-800), var(--ink-850));
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+.mw-step {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ink-750);
+  color: var(--text-2);
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.mw-step:hover { border-color: var(--accent); color: var(--accent); background: var(--ink-700); }
+.mw-step.off { opacity: 0.25; pointer-events: none; }
+
+.mw-strip {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  flex: 1;
+  padding: 1px;
+  scrollbar-width: none;
+}
+.mw-strip::-webkit-scrollbar { display: none; }
+.mw-pill {
+  flex: 0 0 auto;
+  min-width: 30px;
+  padding: 5px 7px;
+  text-align: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.mw-pill:hover { background: var(--ink-700); color: var(--text); }
+/* Three states, and the distinction that matters is played vs still to come —
+   the boundary between them is where you are in the season. */
+.mw-pill.s-played { color: var(--faint); }
+.mw-pill.s-live { color: var(--warn); border-color: rgba(var(--accent-rgb), 0.3); }
+.mw-pill.on {
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.2), rgba(var(--accent-rgb), 0.07));
+  border-color: rgba(var(--accent-rgb), 0.5);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(var(--accent-rgb), 0.16);
+}
+
+/* The same two steps again at the foot, named — so reaching the end of a
+   matchweek does not mean scrolling back up to see the next one. */
+.mw-feet {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.mw-foot {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 14px;
+  background: linear-gradient(180deg, var(--ink-800), var(--ink-850));
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s ease;
+}
+.mw-foot:hover { border-color: rgba(var(--accent-rgb), 0.4); }
+.mw-foot.next { text-align: right; margin-left: auto; }
+.mw-foot-dir {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.mw-foot-name { font-size: 0.86rem; font-weight: 500; color: var(--text-2); }
+.mw-foot:hover .mw-foot-name { color: var(--text); }
+
+/* Both sides' difficulty, under an unplayed kickoff time. */
+.m-fdr { display: inline-flex; gap: 3px; }
+
+@media (max-width: 720px) {
+  .mw-foot-name { font-size: 0.78rem; }
+  .match { grid-template-columns: 1fr auto 1fr; gap: 8px; padding: 10px 12px; }
+  .m-mid { min-width: 72px; }
+  .m-team { font-size: 0.8rem; }
+  .m-side { gap: 6px; }
+  .crest { width: 19px; height: 19px; }
+  .m-detail { grid-template-columns: 1fr; gap: 4px; }
+  .m-rule { display: none; }
+  .m-returns.right, .m-returns.left { justify-content: flex-start; }
+}
+
+/* --- Responsive --------------------------------------------------------- */
+@media (max-width: 720px) {
+  .wrap { padding: 0 12px; }
+  .topbar-inner { padding: 9px 12px; gap: 12px; }
+  .topbar-right { width: 100%; margin-left: 0; }
+  .shirt { width: calc(50% - 6px); }
+  .page-head { padding: 16px 0 12px; }
+  .detail { grid-template-columns: 1fr; }
+  .team-bar-note { margin-left: 0; width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

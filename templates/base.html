@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}FPL Helper{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>⚽</text></svg>">
+</head>
+<body data-version="{{ data_version }}" data-status-url="{{ url_for('main.status') }}">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand">
+      <span class="brand-mark">◆</span> FPL Helper
+      {% if gameweek.next %}<span class="brand-gw">GW{{ gameweek.next.id }} NEXT</span>
+      {% elif gameweek.current %}<span class="brand-gw">GW{{ gameweek.current.id }} LIVE</span>{% endif %}
+    </span>
+
+    <nav class="pages">
+      <a href="{{ url_for('main.matches') }}" {% if request.endpoint == 'main.matches' %}class="active"{% endif %}>Matches</a>
+      <a href="{{ url_for('main.squads') }}" {% if request.endpoint == 'main.squads' %}class="active"{% endif %}>My Squads</a>
+      <a href="{{ url_for('main.stats') }}" {% if request.endpoint == 'main.stats' %}class="active"{% endif %}>My Stats</a>
+      <a href="{{ url_for('main.players') }}" {% if request.endpoint == 'main.players' %}class="active"{% endif %}>Player Stats</a>
+      <a href="{{ url_for('main.builder') }}" {% if request.endpoint == 'main.builder' %}class="active"{% endif %}>Squad Builder</a>
+    </nav>
+
+    <div class="topbar-right">
+      <form method="post" action="{{ url_for('main.refresh_now') }}" data-refresh style="display:inline">
+        <button type="submit" data-refresh-button {% if refresh_running %}disabled{% endif %}>
+          {% if refresh_running %}Refreshing: {{ refresh_stage }}…{% else %}Refresh now{% endif %}
+        </button>
+      </form>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <ul class="flashes">
+      {% for category, message in messages %}<li>{{ message }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+
+  <footer class="foot">
+    <span>
+      Last refreshed:
+      {% if freshness.last_refresh %}
+        <span class="{% if freshness.failed_stages %}fresh-fail{% else %}fresh-ok{% endif %}">{{ freshness.last_refresh | fmt_time }}</span>
+        {% if freshness.last_refresh_seconds %}<span>({{ freshness.last_refresh_seconds }}s)</span>{% endif %}
+      {% else %}
+        <span class="fresh-stale">never — run a refresh</span>
+      {% endif %}
+    </span>
+    {% if freshness.failed_stages %}<span class="fresh-fail">Failed stages: {{ freshness.failed_stages | join(', ') }}</span>{% endif %}
+    <span>
+      Crowd intel:
+      {% if freshness.last_crowd %}
+        <span class="{% if freshness.crowd_failed_stages %}fresh-fail{% else %}fresh-ok{% endif %}">{{ freshness.last_crowd | fmt_time }}</span>
+      {% else %}
+        <span class="fresh-stale">never</span>
+      {% endif %}
+    </span>
+    {% if freshness.projections_built_at %}<span>Projections: {{ freshness.projections_built_at | fmt_time }}</span>{% endif %}
+    {% if freshness.historical_synced_at %}<span>History: {{ freshness.historical_synced_at | fmt_time }}</span>{% endif %}
+  </footer>
+</main>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

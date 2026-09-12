@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ticker, ticker_legend, flag_icon, team_selector %}
+{% block title %}Player Stats · FPL Helper{% endblock %}
+
+{% block content %}
+{# Column explanations, kept in one block rather than strung through the
+   markup. Each is the header's tooltip, and app.js lends the same text to every
+   cell in the column so a value 400 rows down can still say what it is. #}
+{% set help = {
+  'player': 'The player\'s FPL short name; hover for the full name.\nThe caret opens their club\'s and their own record against each of the next six opponents.',
+  'pos':    'Position: GKP, DEF, MID or FWD.\nEvery coloured band on this row is cut against other players in this position, not against the whole game.',
+  'team':   'Club, by three-letter code.',
+  'next6':  'The next six fixtures, earliest first.\nColour is FPL\'s own difficulty rating, 1 (easy) to 5 (hard). 🏠 home, ✈️ away.\nFewer than six cells means fewer fixtures — a blank gameweek.',
+  'price':  'Current selling price: FPL\'s cost ÷ 10.\nDeliberately not colour-banded — cheap is only good for what it frees up.',
+  'ep':     'FPL\'s OWN expected points for the next gameweek, taken straight from their API.\nA second opinion, calculated by them, not by this app. Compare it with xPts.',
+  'xpts':   'This app\'s projected points for the next gameweek — the sum of eight parts:\n• Appearance: 2 × P(60 mins) + 1 × P(played but under 60)\n• Goals: xG/90 × minutes share × opponent adjustment × finishing, × 6/6/5/4 pts by position\n• Assists: xA/90 on the same basis, × 3 pts\n• Clean sheet: e^(−expected goals conceded) × P(60 mins) × 4/4/1/0 pts\n• DefCon: hit rate × 2 pts × P(60 mins)\n• Saves: saves/90 ÷ 3 (keepers)\n• Bonus: bonus per 90 × minutes share\n• Minus cards and, for GKP/DEF, expected −1 per 2 goals conceded\nOpponent adjustment is a Poisson model of both teams\' expected goals, from attack and defence ratings blended between this season and last, ×1.10 at home and ×0.92 away.',
+  'xpts6':  'The xPts above, summed across all six projected gameweeks.\nNot discounted: a point in the sixth gameweek counts the same as one in the next.\nA player with a blank gameweek simply has fewer fixtures in the total.',
+  'pts':    'Total FPL points scored so far this season, as reported by FPL.',
+  'form':   'FPL\'s own form figure: average points per match over the last 30 days.',
+  'own':    'Percentage of FPL managers who own this player.\nDeliberately not colour-banded — a crowded pick is a risk or a safety net depending on what you are trying to do.',
+  'xg90':   'Expected goals per 90 minutes, from FPL\'s xG model.\nHow good the chances were, whether or not they were taken. Read it against G/90.',
+  'xa90':   'Expected assists per 90 minutes, from FPL\'s model.\nHow good the chances created were, whether or not they were converted.',
+  'g90':    'Goals actually scored per 90: 90 × goals ÷ minutes played.\nAbove xG/90 is finishing above the chances; below it is the reverse.',
+  'a90':    'Assists actually made per 90: 90 × assists ÷ minutes played.',
+  'ppg':    'FPL\'s points per game: total points ÷ matches played.',
+  'minst':  'Minutes ÷ starts — how long they last when they are picked.\nSeparates a nailed starter from someone who plays often but comes off on the hour. A dash means they have never started.',
+  'dc90':   'Defensive contributions per 90, from FPL.\nDefenders: tackles, interceptions, blocks and clearances.\nMidfielders and forwards: those plus recoveries.',
+  'dcrel':  'Share of 60+ minute appearances that cleared the DefCon threshold and banked the 2 points — 10 actions for defenders, 12 for midfielders and forwards.\nCounted across this season and the loaded historical seasons. The small figure after it is the sample size; under 5 games it is greyed out as too thin to trust.',
+  'status': 'Availability. An icon appears only when there is something to report:\n? doubtful · ✚ injured · ! suspended · ✕ unavailable · ◆ crowd intel\nHover the icon itself for the club news and the chance of playing.',
+} %}
+
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Player Stats Explorer</div>
+    <h1>{{ players | length }} players, underlying numbers</h1>
+  </div>
+  {{ ticker_legend() }}
+</div>
+
+{{ team_selector(all_entries, selected_team_id,
+                 note='marks the ' ~ owned_count ~ ' players you own') }}
+
+<div class="notice">
+  <span class="band-key"><span class="chip b-good">good</span><span class="chip b-avg">average</span><span class="chip b-bad">below average</span><span class="chip b-thin">too soon to say</span></span>
+  Each number is graded against others <strong>in the same position</strong>.
+  Open the <span class="caret-key">▾</span> next to a name for the history behind the
+  fixtures: how the player's club has done against each of the next six opponents,
+  and what the player himself did in those games.
+</div>
+
+<div class="panel">
+  <div class="filters">
+    <label class="field">Search
+      <input type="search" placeholder="name…" data-filter-for="player-table" data-filter-key="name" data-filter-mode="contains">
+    </label>
+    <label class="field">Position
+      <select data-filter-for="player-table" data-filter-key="pos" data-filter-mode="equals">
+        <option value="">All</option>
+        <option value="GKP">Goalkeepers</option>
+        <option value="DEF">Defenders</option>
+        <option value="MID">Midfielders</option>
+        <option value="FWD">Forwards</option>
+      </select>
+    </label>
+    <label class="field">Team
+      <select data-filter-for="player-table" data-filter-key="team" data-filter-mode="equals">
+        <option value="">All</option>
+        {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field">Max £m
+      <input type="number" step="0.1" min="3.5" max="16" placeholder="any" style="width:74px"
+             data-filter-for="player-table" data-filter-key="price" data-filter-mode="max">
+    </label>
+    <label class="field">Min minutes
+      <input type="number" step="90" min="0" placeholder="0" style="width:74px"
+             data-filter-for="player-table" data-filter-key="minutes" data-filter-mode="min">
+    </label>
+    <label class="field">Squad
+      <select data-filter-for="player-table" data-filter-key="owned" data-filter-mode="equals">
+        <option value="">Everyone</option>
+        <option value="1">Mine only</option>
+        <option value="0">Not owned</option>
+      </select>
+    </label>
+    <label class="field">Max own %
+      <input type="number" step="1" min="0" max="100" placeholder="any" style="width:74px"
+             data-filter-for="player-table" data-filter-key="own" data-filter-mode="max">
+    </label>
+    <span class="spacer"></span>
+    <span class="result-count" data-count-for="player-table"></span>
+  </div>
+
+  <div class="table-scroll fill">
+    {# The base of the per-player history endpoint; the id is appended in JS. #}
+    <table data-sortable id="player-table"
+           data-opponents-base="{{ url_for('main.player_opponents', player_id=0) | replace('/0/opponents', '') }}">
+      <thead>
+        <tr>
+          <th data-type="text" title="{{ help.player }}">Player</th>
+          <th data-type="text" title="{{ help.pos }}">Pos</th>
+          <th data-type="text" title="{{ help.team }}">Team</th>
+          <th data-nosort title="{{ help.next6 }}">Next 6</th>
+          <th class="num" title="{{ help.price }}">£m</th>
+          <th class="num" title="{{ help.ep }}">EP</th>
+          <th class="num" title="{{ help.xpts }}">xPts</th>
+          <th class="num" title="{{ help.xpts6 }}">xPts 6</th>
+          <th class="num" title="{{ help.pts }}">Pts</th>
+          <th class="num" title="{{ help.form }}">Form</th>
+          <th class="num" title="{{ help.own }}">Own %</th>
+          <th class="num" title="{{ help.xg90 }}">xG/90</th>
+          <th class="num" title="{{ help.xa90 }}">xA/90</th>
+          <th class="num" title="{{ help.g90 }}">G/90</th>
+          <th class="num" title="{{ help.a90 }}">A/90</th>
+          <th class="num" title="{{ help.ppg }}">PPG</th>
+          <th class="num" title="{{ help.minst }}">Min/st</th>
+          <th class="num" title="{{ help.dc90 }}">DC/90</th>
+          <th class="num" title="{{ help.dcrel }}">DC rel.</th>
+          <th data-nosort title="{{ help.status }}">St</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in players %}
+        <tr data-name="{{ p.full_name }} {{ p.name }}" data-pos="{{ p.position }}" data-team="{{ p.team }}"
+            data-price="{{ p.price }}" data-minutes="{{ p.minutes }}" data-own="{{ p.ownership }}"
+            data-owned="{{ 1 if p.owned else 0 }}" data-player="{{ p.id }}">
+          {# The caret is inside the cell so the column count is unchanged; the
+             sort key is set explicitly so its glyph never reaches the sorter. #}
+          <td class="name" title="{{ p.full_name }}" data-sort="{{ p.name }}">
+            <button type="button" class="caret" data-expand aria-expanded="false"
+                    title="Record against the next six opponents">▾</button>{{ p.name }}{% if p.owned %} <span class="badge accent" title="In the selected squad">owned</span>{% endif %}
+          </td>
+          <td><span class="pos">{{ p.position }}</span></td>
+          <td><span class="team-tag">{{ p.team }}</span></td>
+          <td>{{ ticker(p.fixtures) }}</td>
+          <td class="num">{{ '%.1f' % p.price }}</td>
+          <td class="num {{ p.bands.ep_next }}">{{ p.ep_next }}</td>
+          <td class="num {{ p.bands.xpts_next }}"><strong>{{ '%.2f' % p.xpts_next }}</strong></td>
+          <td class="num {{ p.bands.xpts_horizon }}">{{ '%.1f' % p.xpts_horizon }}</td>
+          <td class="num {{ p.bands.total_points }}">{{ p.total_points }}</td>
+          <td class="num {{ p.bands.form }}">{{ p.form }}</td>
+          <td class="num">{{ p.ownership }}</td>
+          <td class="num {{ p.bands.xg90 }}">{{ '%.2f' % p.xg90 }}</td>
+          <td class="num {{ p.bands.xa90 }}">{{ '%.2f' % p.xa90 }}</td>
+          <td class="num {{ p.bands.goals90 }}">{{ '%.2f' % p.goals90 }}</td>
+          <td class="num {{ p.bands.assists90 }}">{{ '%.2f' % p.assists90 }}</td>
+          <td class="num {{ p.bands.ppg }}">{{ p.ppg }}</td>
+          {# Sorts on 0 but reads as a dash: nobody has "0 minutes per start". #}
+          <td class="num {{ p.bands.mins_per_start }}" data-sort="{{ p.mins_per_start }}">
+            {% if p.starts %}{{ '%.0f' % p.mins_per_start }}{% else %}<span class="miss">—</span>{% endif %}
+          </td>
+          <td class="num {{ p.bands.defcon90 }}">{{ '%.1f' % p.defcon90 }}</td>
+          {# Sorts below every real rate when the sample is too thin to trust. #}
+          <td class="num {{ p.bands.defcon_reliability }}"
+              data-sort="{{ p.defcon_reliability if (p.defcon_reliability is not none and p.defcon_sample >= 5) else -1 }}"
+              title="{% if p.defcon_sample %}{{ p.defcon_sample }} game{{ '' if p.defcon_sample == 1 else 's' }} of 60+ minutes, needs {{ p.defcon_threshold }} actions{% if p.defcon_sample < 5 %} — too few to trust{% endif %}{% else %}No sample{% endif %}">
+            {% if p.defcon_reliability is not none %}{{ '%.0f%%' % (p.defcon_reliability * 100) }}<span class="miss" style="font-size:0.85em">/{{ p.defcon_sample }}</span>{% else %}<span class="miss">—</span>{% endif %}
+          </td>
+          <td class="status-cell">{{ flag_icon(p.status, p.news, p.chance) }}{% if p.crowd and p.crowd.availability not in ('unknown','fit') %}<span class="stat-icon crowd" title="Crowd intel: {{ p.crowd.availability }} — {{ p.crowd.reasons | join(' · ') }}">◆</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

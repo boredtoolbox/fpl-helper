@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}{% if meta %}{{ meta.name }} · {% endif %}Matches · FPL Helper{% endblock %}
+
+{# A club crest, or its three-letter code until the refresh has fetched one.
+   Decorative: the club is already named beside it, so it carries an empty alt
+   rather than repeating the name to a screen reader. #}
+{% macro crest(side) %}
+{%- if side.crest %}
+<img class="crest" src="{{ url_for('static', filename=side.crest) }}" alt=""
+     width="22" height="22" loading="lazy" title="{{ side.name }}">
+{%- else %}
+<span class="crest crest-missing" title="{{ side.name }}" aria-hidden="true">{{ side.short }}</span>
+{%- endif %}
+{% endmacro %}
+
+{# One fixture. The same three-column shape before and after kickoff — only the
+   middle changes, from a clock to a scoreline — so a gameweek in progress does
+   not reflow as its games go off. #}
+{% macro match(f) %}
+<div class="match{% if f.started %} played{% endif %}">
+  {# Crests sit against the score rather than out at the margins, so the two
+     clubs read inward toward the result — the way the league's own fixture
+     pages do it. #}
+  <div class="m-side home">
+    <span class="m-team{% if f.finished and f.home.score > f.away.score %} won{% endif %}">{{ f.home.name }}</span>
+    {{ crest(f.home) }}
+  </div>
+
+  <div class="m-mid">
+    {% if f.started %}
+    <span class="m-score">{{ f.home.score if f.home.score is not none else '–' }}<i>–</i>{{ f.away.score if f.away.score is not none else '–' }}</span>
+    {% if f.finished %}<span class="m-state">FT</span>
+    {% else %}<span class="m-state live"><span class="live-dot"></span>{{ f.minutes }}′</span>{% endif %}
+    {% else %}
+    <span class="m-kick">{{ f.kickoff_time | fmt_clock }}</span>
+    <span class="m-fdr">
+      <span class="fdr-pill fdr-{{ f.home.difficulty or 3 }}" title="FPL difficulty {{ f.home.difficulty or '?' }} for {{ f.home.name }}">{{ f.home.difficulty or '?' }}</span>
+      <span class="fdr-pill fdr-{{ f.away.difficulty or 3 }}" title="FPL difficulty {{ f.away.difficulty or '?' }} for {{ f.away.name }}">{{ f.away.difficulty or '?' }}</span>
+    </span>
+    {% endif %}
+  </div>
+
+  <div class="m-side away">
+    {{ crest(f.away) }}
+    <span class="m-team{% if f.finished and f.away.score > f.home.score %} won{% endif %}">{{ f.away.name }}</span>
+  </div>
+
+  {% if f.has_stats %}
+  <div class="m-detail">
+    {{ returns(f.home, 'right') }}
+    <span class="m-rule"></span>
+    {{ returns(f.away, 'left') }}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# Goals and assists for one side. An own goal is listed under the team it
+   counted for and marked, which is both the convention and what makes these add
+   up to the scoreline above them. #}
+{% macro returns(side, align) %}
+<div class="m-returns {{ align }}">
+  {% for g in side.goals %}
+  <span class="ret goal{% if g.own %} og{% endif %}"
+        title="{{ g.name }}{% if g.own %} — own goal{% else %} — {{ g.value }} goal{{ '' if g.value == 1 else 's' }}{% endif %}">
+    <span class="ret-icon">⚽</span>{{ g.name }}{% if g.value > 1 %} ×{{ g.value }}{% endif %}{% if g.own %} <span class="ret-og">og</span>{% endif %}
+  </span>
+  {% endfor %}
+  {% for a in side.assists %}
+  <span class="ret assist" title="{{ a.name }} — {{ a.value }} assist{{ '' if a.value == 1 else 's' }}">
+    <span class="ret-icon assist-mark">A</span>{{ a.name }}{% if a.value > 1 %} ×{{ a.value }}{% endif %}
+  </span>
+  {% endfor %}
+  {% for c in side.cards %}
+  <span class="ret card{% if c.red %} red{% endif %}" title="{{ c.name }} — {{ 'red card' if c.red else 'yellow card' }}">
+    <span class="ret-icon">{{ '🟥' if c.red else '🟨' }}</span>{{ c.name }}
+  </span>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Matches</div>
+    <h1>{{ meta.name if meta else 'Fixtures and results' }}</h1>
+  </div>
+  <span class="ticker-legend">
+    FDR <span class="swatch fdr-1"></span><span class="swatch fdr-2"></span><span class="swatch fdr-3"></span><span class="swatch fdr-4"></span><span class="swatch fdr-5"></span>
+    <span>easy → hard, per side</span>
+  </span>
+</div>
+
+{% if not index %}
+<div class="panel"><div class="empty">
+  <h3>No fixtures yet</h3>
+  <p>The fixture list has not been fetched — run a refresh.</p>
+</div></div>
+{% elif not week %}
+<div class="panel"><div class="empty">
+  <h3>No gameweek {{ unknown_event }}</h3>
+  <p>Pick one from the bar above.</p>
+</div></div>
+{% endif %}
+
+{# The navigation bar: a step either side, every gameweek between them. The
+   strip scrolls rather than wraps, so the bar is one line tall whatever the
+   window is doing, and the selected week is scrolled into view on load. #}
+{% if index %}
+<nav class="mw-bar" aria-label="Gameweek">
+  {% if prev_event %}
+  <a class="mw-step" href="{{ url_for('main.matchweek', event=prev_event) }}" rel="prev"
+     title="Gameweek {{ prev_event }}" aria-label="Previous gameweek">‹</a>
+  {% else %}<span class="mw-step off" aria-hidden="true">‹</span>{% endif %}
+
+  <div class="mw-strip" data-mw-strip>
+    {% for w in index %}
+    <a class="mw-pill s-{{ w.state }}{% if meta and w.event == meta.event %} on{% endif %}"
+       href="{{ url_for('main.matchweek', event=w.event) }}"
+       {% if meta and w.event == meta.event %}aria-current="page" data-mw-current{% endif %}
+       title="{{ w.name }} — {{ {'played':'played','live':'being played now','upcoming':'still to come'}[w.state] }}">{{ w.event }}</a>
+    {% endfor %}
+  </div>
+
+  {% if next_event %}
+  <a class="mw-step" href="{{ url_for('main.matchweek', event=next_event) }}" rel="next"
+     title="Gameweek {{ next_event }}" aria-label="Next gameweek">›</a>
+  {% else %}<span class="mw-step off" aria-hidden="true">›</span>{% endif %}
+</nav>
+{% endif %}
+
+{% if week %}
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{ meta.name }}</h2>
+    <span class="result-count">
+      {{ week.fixtures | length }} match{{ '' if week.fixtures | length == 1 else 'es' }} ·
+      {%- if week.progress.state == 'upcoming' %} not started
+      {%- elif week.progress.state == 'live' %} <span class="live"><span class="live-dot"></span>{{ week.progress.finished }} of {{ week.progress.total }} finished</span>
+      {%- elif week.progress.state == 'provisional' %} played, but FPL has not finished its checks — bonus can still move
+      {%- elif week.progress.state == 'final' %} signed off by FPL
+      {%- else %} {{ week.progress.state }}{% endif %}
+    </span>
+  </div>
+
+  {% if not week.fixtures %}
+  <div class="empty">
+    <h3>A blank gameweek</h3>
+    <p>No fixtures are scheduled for {{ meta.name | lower }}.</p>
+  </div>
+  {% else %}
+  {% for day in week.days %}
+  <div class="match-group">
+    <div class="mg-head">
+      <span class="mg-gw">{{ day.date | fmt_day }}</span>
+      <span class="mg-note">{{ day.fixtures | length }} match{{ '' if day.fixtures | length == 1 else 'es' }}</span>
+    </div>
+    {% for f in day.fixtures %}{{ match(f) }}{% endfor %}
+  </div>
+  {% endfor %}
+
+  {% if week.progress.started and not week.fixtures | selectattr('has_stats') | list %}
+  <div class="empty" style="padding:18px">
+    Scorers and assists for this gameweek have not been fetched yet — run a refresh.
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+
+<nav class="mw-feet">
+  {% if prev_event %}
+  <a class="mw-foot" href="{{ url_for('main.matchweek', event=prev_event) }}" rel="prev">
+    <span class="mw-foot-dir">‹ Previous</span><span class="mw-foot-name">Gameweek {{ prev_event }}</span>
+  </a>
+  {% else %}<span></span>{% endif %}
+  {% if next_event %}
+  <a class="mw-foot next" href="{{ url_for('main.matchweek', event=next_event) }}" rel="next">
+    <span class="mw-foot-dir">Next ›</span><span class="mw-foot-name">Gameweek {{ next_event }}</span>
+  </a>
+  {% endif %}
+</nav>
+{% endif %}
+{% endblock %}
