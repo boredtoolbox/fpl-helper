@@ -79,6 +79,10 @@ class Config:
         return self.team_labels.get(int(team_id))
 
 
+class ConfigError(Exception):
+    """A config file that exists but cannot be used, with a message for humans."""
+
+
 def _resolve(value: Any, default: Path) -> Path:
     if value in (None, ""):
         return default
@@ -108,6 +112,36 @@ def _optional_hour(value: Any) -> int | None:
     return hour
 
 
+def _yaml_error_message(cfg_path: Path, exc: yaml.YAMLError) -> str:
+    """Turn a YAML traceback into something you can act on.
+
+    Nearly every report of this is indentation: a `key: value` pair nested one
+    space under a top-level key, usually from uncommenting a template line and
+    leaving the leading space behind. Point at the offending line and say so.
+    """
+    lines = [f"Could not parse {cfg_path}:"]
+    mark = getattr(exc, "problem_mark", None)
+    problem = getattr(exc, "problem", None) or "invalid YAML"
+    if mark is not None:
+        source = cfg_path.read_text(encoding="utf-8").splitlines()
+        lineno = mark.line + 1
+        lines.append(f"  line {lineno}, column {mark.column + 1}: {problem}")
+        if 0 <= mark.line < len(source):
+            lines.append(f"    {source[mark.line]}")
+            lines.append(f"    {' ' * mark.column}^")
+    else:
+        lines.append(f"  {problem}")
+    lines.append(
+        "Check the indentation on that line. Top-level keys (team_ids, "
+        "team_labels, ...) start at column 1 with no leading spaces; entries "
+        "underneath them are indented by exactly two spaces. Note that "
+        "`team_labels: {}` is an empty mapping -- to add labels, drop the `{}` "
+        "and put each `id: \"name\"` on its own two-space-indented line below. "
+        "config.example.yaml is a working reference."
+    )
+    return "\n".join(lines)
+
+
 def load_config(path: str | os.PathLike[str] | None = None) -> Config:
     """Load config.yaml, falling back to config.example.yaml."""
     if path is not None:
@@ -125,9 +159,21 @@ def load_config(path: str | os.PathLike[str] | None = None) -> Config:
 
     raw: dict[str, Any] = {}
     if cfg_path.exists():
-        loaded = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        # Open the file rather than pass its text, so YAML's error marks name
+        # the actual path instead of "<unicode string>".
+        try:
+            with cfg_path.open(encoding="utf-8") as handle:
+                loaded = yaml.safe_load(handle)
+        except yaml.YAMLError as exc:
+            raise ConfigError(_yaml_error_message(cfg_path, exc)) from exc
         if isinstance(loaded, dict):
             raw = loaded
+        elif loaded is not None:
+            raise ConfigError(
+                f"{cfg_path} should be a set of `key: value` settings, but it "
+                f"parsed as {type(loaded).__name__}. Compare it with "
+                f"config.example.yaml."
+            )
     else:
         log.warning("No config file found at %s; using defaults.", cfg_path)
 

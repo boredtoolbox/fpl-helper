@@ -7,10 +7,12 @@ team_ids:
   - 1234567
   - 7654321
 
-# Friendly labels for the team selector (optional; falls back to the FPL team name)
-team_labels: {}
-#  1234567: "Main squad"
-#  7654321: "Experiment"
+# Friendly labels for the team selector (optional; falls back to the FPL team
+# name). To use it, uncomment the whole block below -- the "team_labels:" line
+# included -- and keep the two-space indent on the entries.
+# team_labels:
+#   1234567: "Main squad"
+#   7654321: "Experiment"
 
 # Path to a plain-text file containing ONLY your Gemini API key.
 # Get one free at https://aistudio.google.com/apikey

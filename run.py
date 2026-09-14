@@ -14,6 +14,7 @@ import argparse
 import socket
 
 from app import create_app
+from app.config import ConfigError
 
 
 def local_address() -> str:
@@ -37,7 +38,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    app = create_app(args.config, start_scheduler=not args.no_scheduler)
+    try:
+        app = create_app(args.config, start_scheduler=not args.no_scheduler)
+    except ConfigError as exc:
+        # A broken config.yaml is a typo, not a bug — say what to fix, not where
+        # in the YAML parser it surfaced.
+        print(f"\n{exc}\n")
+        return 1
     cfg = app.config["FPL_CONFIG"]
 
     print()

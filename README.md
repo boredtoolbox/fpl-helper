@@ -221,6 +221,12 @@ Notes:
   your IDs into issues or screenshots.
 - IDs must be **integers, unquoted**. The keys in `team_labels` must match the
   numbers in `team_ids` exactly.
+- **Indentation is the whole game in YAML.** `team_ids` and `team_labels` start
+  at column 1 with no leading space; the lines under them are indented by
+  exactly two spaces. `team_labels: {}` means "no labels" — to add some, drop
+  the `{}` and put each entry on its own indented line below the key. Leaving
+  the `{}` (or a stray leading space) in place is what produces
+  `yaml.parser.ParserError: expected <block end>`.
 - After changing them, restart the app and run a refresh
   (`python -m app.refresh`) so the new entry's squad and leagues are pulled in.
 
