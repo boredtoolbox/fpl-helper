@@ -1060,6 +1060,202 @@ def _current_player_meetings(
     return out
 
 
+def _season_log(
+    conn: sqlite3.Connection,
+    player_id: int,
+    team_id: int,
+    element_type: int,
+    teams: dict[int, dict[str, Any]],
+) -> dict[str, Any]:
+    """Every match of this season for one player, oldest first, plus the totals.
+
+    The opponent blocks beside it answer "how does this player go against these
+    teams"; this answers "what have they actually been doing lately", which is
+    the other half of the same question, and the half the table's season-long
+    averages flatten into a single number.
+
+    The spine is the club's finished fixtures, not the player's history rows.
+    That distinction is the whole correctness of this function: element
+    summaries are fetched on a per-player budget, so 300-odd players are
+    carrying a single history row from whenever they were last picked up, and
+    building the log out of those rows would quietly drop the gameweeks nobody
+    had fetched yet — the player who scored in GW2 would be shown a season with
+    no GW2 in it. Walking the fixtures instead means every gameweek that has
+    been played is listed for everyone, and the gaps are marked as gaps.
+
+    Each fixture is then filled from the best source that has it:
+
+    * `player_gw_history` — minutes, DefCon, clean sheet, goals conceded and the
+      match's points. Only this has them, and only where it has been fetched.
+    * `fixture_stats` — goals, assists, saves, bonus and cards. Complete for
+      every fixture and every player (see the note on the table in db.py), so
+      these read as real zeroes even on a gameweek with no history row.
+
+    A fixture with no history row is therefore `partial`, not `blank`: what was
+    scored is known, what was played is not, and the page says so rather than
+    printing a nought the player never earned.
+    """
+    threshold = DEFCON_THRESHOLD.get(element_type)
+
+    # Every event this player registered, whether or not their summary is in.
+    events: dict[int, dict[str, int]] = {}
+    for r in conn.execute(
+        "SELECT fixture, identifier, value FROM fixture_stats WHERE player_id = ?",
+        (player_id,),
+    ):
+        events.setdefault(r["fixture"], {})[r["identifier"]] = r["value"] or 0
+
+    history: dict[int, sqlite3.Row] = {
+        r["fixture"]: r for r in conn.execute(
+            "SELECT fixture, round, opponent_team, was_home, minutes, starts, "
+            "total_points, goals_scored, assists, clean_sheets, goals_conceded, "
+            "saves, bonus, bps, yellow_cards, red_cards, own_goals, "
+            "penalties_missed, penalties_saved, expected_goals, expected_assists, "
+            "defensive_contribution FROM player_gw_history WHERE player_id = ?",
+            (player_id,),
+        )
+    }
+
+    # The club's finished matches, plus any fixture the player has a history row
+    # for that is not among them — which is how a mid-season move keeps the
+    # half-season played in the other shirt.
+    #
+    # The other half of a move is left alone on purpose: the new club's earlier
+    # fixtures stay in the list, marked as not fetched. Nothing here separates
+    # "was not at this club yet" from "summary not pulled yet", and a rule that
+    # dropped the club fixture whenever a history row sat elsewhere in the round
+    # would throw away the second match of a double gameweek. Seventeen players
+    # carry a spare row; none of them is shown as a blank they sat through.
+    spine: dict[int, dict[str, Any]] = {}
+    for r in conn.execute(
+        "SELECT id, event, team_h, team_a, team_h_score, team_a_score, "
+        "team_h_difficulty, team_a_difficulty, kickoff_time FROM fixtures "
+        "WHERE finished = 1 AND (team_h = ? OR team_a = ?)",
+        (team_id, team_id),
+    ):
+        home = r["team_h"] == team_id
+        spine[r["id"]] = {
+            "event": r["event"],
+            "home": home,
+            "opp_id": r["team_a"] if home else r["team_h"],
+            "difficulty": r["team_h_difficulty"] if home else r["team_a_difficulty"],
+            "scored": r["team_h_score"] if home else r["team_a_score"],
+            "against": r["team_a_score"] if home else r["team_h_score"],
+            "kickoff": r["kickoff_time"] or "",
+        }
+    for fixture, h in history.items():
+        if fixture in spine:
+            continue
+        spine[fixture] = {
+            "event": h["round"],
+            "home": bool(h["was_home"]),
+            "opp_id": h["opponent_team"],
+            "difficulty": None,
+            "scored": None,
+            "against": None,
+            "kickoff": "",
+        }
+
+    rows: list[dict[str, Any]] = []
+    for fixture, meta in sorted(
+        spine.items(), key=lambda kv: (kv[1]["event"] or 0, kv[1]["kickoff"], kv[0])
+    ):
+        h = history.get(fixture)
+        ev = events.get(fixture, {})
+        opponent = teams.get(meta["opp_id"]) or {}
+        scored, against = meta["scored"], meta["against"]
+        defcon = h["defensive_contribution"] if h is not None else None
+        rows.append(
+            {
+                "event": meta["event"],
+                "home": meta["home"],
+                "opp": opponent.get("short") or "?",
+                "opp_name": opponent.get("name") or "Unknown",
+                "difficulty": meta["difficulty"],
+                # `loaded` is what the page keys its three row states off: a
+                # played game, a game watched, and a game we cannot yet say
+                # which of those it was.
+                "loaded": h is not None,
+                "minutes": h["minutes"] or 0 if h is not None else None,
+                "started": bool(h["starts"]) if h is not None else None,
+                # Events come from the complete source, so they stand whether or
+                # not the summary has been fetched.
+                "goals": ev.get("goals_scored", 0),
+                "assists": ev.get("assists", 0),
+                "saves": ev.get("saves", 0),
+                "bonus": ev.get("bonus", 0),
+                "yellow": ev.get("yellow_cards", 0),
+                "red": ev.get("red_cards", 0),
+                "own_goals": ev.get("own_goals", 0),
+                "pens_missed": ev.get("penalties_missed", 0),
+                "pens_saved": ev.get("penalties_saved", 0),
+                "defcon": defcon,
+                # Whether the shift banked the 2 points, not just how busy it
+                # was: 9 actions and 10 are one point apart in the table and
+                # two apart on the scoresheet.
+                "defcon_hit": bool(threshold and defcon is not None and defcon >= threshold),
+                "clean_sheet": bool(h["clean_sheets"]) if h is not None else None,
+                "conceded": h["goals_conceded"] or 0 if h is not None else None,
+                "points": h["total_points"] or 0 if h is not None else None,
+                "score": (
+                    f"{scored}\u2013{against}"
+                    if scored is not None and against is not None else ""
+                ),
+                "result": (
+                    _result(scored, against)
+                    if scored is not None and against is not None else ""
+                ),
+            }
+        )
+
+    return {"rows": rows, "totals": _season_totals(conn, player_id, rows, threshold)}
+
+
+def _season_totals(
+    conn: sqlite3.Connection,
+    player_id: int,
+    rows: list[dict[str, Any]],
+    threshold: int | None,
+) -> dict[str, Any]:
+    """The season's figures, taken from the players table rather than summed.
+
+    Summing the log would make the total only as complete as the log, and on a
+    player whose summary is a gameweek behind that is a total that disagrees
+    with the Pts column three inches above it. The bootstrap row is the same
+    number FPL shows and is right for everybody, so the footer is trustworthy
+    even while a row above it is still waiting to be filled in.
+    """
+    r = conn.execute(
+        "SELECT minutes, starts, goals_scored, assists, clean_sheets, "
+        "goals_conceded, saves, bonus, yellow_cards, red_cards, "
+        "defensive_contribution, total_points FROM players WHERE id = ?",
+        (player_id,),
+    ).fetchone()
+    loaded = [row for row in rows if row["loaded"]]
+    return {
+        "games": len(rows),
+        # Counted off the log, so it can only speak for the rows it has.
+        "loaded": len(loaded),
+        "missing": len(rows) - len(loaded),
+        "played": sum(1 for row in loaded if row["minutes"]),
+        "starts": r["starts"] or 0,
+        "minutes": r["minutes"] or 0,
+        "goals": r["goals_scored"] or 0,
+        "assists": r["assists"] or 0,
+        "defcon": r["defensive_contribution"] or 0,
+        "defcon_hits": sum(1 for row in loaded if row["defcon_hit"]),
+        "defcon_chances": sum(1 for row in loaded if (row["minutes"] or 0) >= 60),
+        "threshold": threshold,
+        "saves": r["saves"] or 0,
+        "clean_sheets": r["clean_sheets"] or 0,
+        "conceded": r["goals_conceded"] or 0,
+        "bonus": r["bonus"] or 0,
+        "yellow": r["yellow_cards"] or 0,
+        "red": r["red_cards"] or 0,
+        "points": r["total_points"] or 0,
+    }
+
+
 def opponent_history(conn: sqlite3.Connection, player_id: int) -> dict[str, Any] | None:
     """Club and player record against each of a player's next fixtures.
 
@@ -1160,6 +1356,10 @@ def opponent_history(conn: sqlite3.Connection, player_id: int) -> dict[str, Any]
         },
         "limit": HISTORY_LIMIT,
         "fixtures": fixtures,
+        "season": season,
+        "season_log": _season_log(
+            conn, player_id, row["team"], row["element_type"], teams
+        ),
     }
 
 

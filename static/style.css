@@ -927,11 +927,11 @@ tbody tr.detail-row:hover { background: var(--ink-850); }
 .detail-block { background: var(--ink-850); padding: 12px 14px 14px; }
 .detail-title {
   font-family: var(--font-mono);
-  font-size: 0.64rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.09em;
   color: var(--text-2);
-  margin: 0 0 9px;
+  margin: 0 0 11px;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -954,18 +954,28 @@ tbody tr.detail-row:hover { background: var(--ink-850); }
 }
 .opp-gw {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   color: var(--faint);
   letter-spacing: 0.04em;
 }
 .opp-runs { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 
+/* The fixture chips in an expanded row can afford to be bigger than the ones
+   in the table: the panel has one row's worth of width to play with, where the
+   Next 6 column is squeezed between nineteen others. Scoped so bumping one
+   does not resize the other. */
+.detail .tick {
+  font-size: 0.74rem;
+  min-width: 36px;
+  padding: 3px 5px;
+}
+
 /* One past meeting. Result first because that is what the eye is scanning for,
    the scoreline after it for the detail. */
 .meet {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
-  padding: 2px 7px;
+  font-size: 0.82rem;
+  padding: 3px 8px;
   border-radius: var(--radius);
   border: 1px solid transparent;
   white-space: nowrap;
@@ -976,7 +986,7 @@ tbody tr.detail-row:hover { background: var(--ink-850); }
 .meet.loss { background: rgba(var(--bad-rgb),0.13); color: var(--bad-text); border-color: rgba(var(--bad-rgb),0.3); }
 .meet.none {
   font-family: var(--font-body);
-  font-size: 0.74rem;
+  font-size: 0.85rem;
   color: var(--faint);
   font-style: italic;
   padding-left: 0;
@@ -986,13 +996,13 @@ tbody tr.detail-row:hover { background: var(--ink-850); }
 .perf {
   display: inline-flex;
   align-items: baseline;
-  gap: 6px;
-  padding: 2px 8px;
+  gap: 7px;
+  padding: 3px 9px;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
   background: var(--ink-800);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   white-space: nowrap;
 }
 .perf .pf-min { color: var(--faint); }
@@ -1000,6 +1010,118 @@ tbody tr.detail-row:hover { background: var(--ink-850); }
 /* Anything that actually returned. A goal, an assist, or a defensive shift that
    cleared this position's DefCon threshold and banked the two points. */
 .perf .pf.on { color: var(--accent); font-weight: 600; }
+
+/* --- This season, game by game -------------------------------------------
+   The first of the three blocks in an expanded row. It is a real <table>
+   because it is a real table, which means undoing the explorer's own table
+   styling around it: the sticky header here belongs to this block's scroller,
+   not to the page's.
+
+   An ordinary grid item, deliberately. The panel's `auto-fit` track list
+   collapses the tracks nothing lands in, so a block spanning `1 / -1` would
+   hold every track open and strand the two opponent blocks in half the width.
+   `min-width: 0` is what lets the scroller below keep to its track — a grid
+   item's automatic minimum is its content, which a wide log would push past. */
+.season-block { min-width: 0; }
+/* Shrink-wrapped rather than stretched: ten narrow columns spread across a
+   twenty-column table would put half a screen of nothing between Pts and the
+   edge. `inline-block` lets the box end where the numbers do, and cap the
+   height so an April-length log does not push the opponent blocks off screen. */
+.gwlog-wrap {
+  display: inline-block;
+  max-width: 100%;
+  max-height: 400px;
+  overflow: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--ink-800);
+}
+table.gwlog { width: auto; font-size: 0.88rem; }
+.gwlog thead th {
+  background: var(--ink-750);
+  padding: 7px 10px;
+  font-size: 0.7rem;
+  letter-spacing: 0.07em;
+  border-bottom: 1px solid var(--line);
+  /* The opponent chips are positioned, and a positioned element later in the
+     document paints over a sticky one that never claimed a layer. Without this
+     a scrolled row slides over its own header rather than under it. */
+  z-index: 2;
+}
+.gwlog tbody td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text-2);
+}
+.gwlog tbody tr:last-child td { border-bottom: 0; }
+.gwlog tbody tr:hover { background: rgba(var(--accent-2-rgb), 0.07); }
+.gwlog td.num, .gwlog th.num { text-align: right; font-family: var(--font-mono); }
+.gwlog .gw-cell { padding-right: 4px; }
+.gwlog .gw-marks { padding-left: 6px; }
+
+/* Same three states as an opponent line above: the accent for anything that
+   actually returned, faint for nothing to report, and the one red for a cost. */
+.gwlog .on  { color: var(--accent); font-weight: 600; }
+.gwlog .dim { color: var(--faint); }
+.gwlog .off { color: var(--bad-text); }
+.gwlog .tot { color: var(--text); font-weight: 600; }
+/* A game watched from the bench. Dimmed whole rather than dropped: a run of
+   them is the clearest thing on the page about whether a player is nailed on. */
+.gwlog tr.dnp td { color: var(--faint); background: rgba(var(--faint-rgb), 0.05); }
+/* A gameweek whose summary has not been fetched. Deliberately NOT dimmed like
+   a blank: the goals and assists on this row are real and complete, and only
+   the columns that carry a `?` are waiting. The hatch marks the row as pending
+   without arguing that nothing happened in it. */
+.gwlog tr.partial td {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 5px,
+    rgba(var(--faint-rgb), 0.07) 5px 10px
+  );
+}
+
+.gwlog tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--ink-750);
+  border-top: 1px solid var(--line);
+  padding: 7px 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.gwlog .gw-total-label {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.82rem;
+  color: var(--faint);
+  text-align: right;
+}
+
+/* Cards and misses. Only drawn when they happened, so an empty cell means a
+   clean afternoon rather than an unknown one. */
+.mk {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.5;
+  padding: 1px 4px;
+  border-radius: 2px;
+  margin-right: 3px;
+}
+.mk.yellow { background: var(--accent); color: var(--on-bright); }
+.mk.red    { background: var(--fdr-5); color: #ffeef1; }
+.mk.good   { background: rgba(var(--good-rgb), 0.2); color: var(--good-text); }
+
+.season-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  max-width: 60ch;
+}
 
 /* --- Sub-tabs ------------------------------------------------------------
    Alternative answers to one question, so they sit inside the panel rather
@@ -1492,6 +1614,198 @@ td.said {
   .m-detail { grid-template-columns: 1fr; gap: 4px; }
   .m-rule { display: none; }
   .m-returns.right, .m-returns.left { justify-content: flex-start; }
+}
+
+/* --- Side by side comparison -------------------------------------------
+   The explorer answers "who is out there"; this answers "which of these two".
+   Ticking a row stands it up in a panel alongside the table, turned on its
+   side — a column per player, a row per stat — so a decision is read across a
+   line rather than carried between two rows forty apart.
+
+   The panel is sized by its contents rather than given a fixed width: with one
+   player ticked it is a narrow strip and the table keeps almost all of the
+   page, and it only grows as far as the cap before scrolling inside itself. */
+.compare-layout { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+.compare-layout > .panel { margin-bottom: 0; }
+/* min-width: 0 is what lets the table half shrink at all — without it a flex
+   item refuses to go below the width of its content, and a 20-column table
+   would simply push the panel off the page. */
+.compare-layout > .players-panel { flex: 1 1 auto; min-width: 0; }
+/* Nothing here shrinks. Sharing the overflow between the two halves squeezed
+   a column of the comparison off its own edge while the table — which has a
+   scroll box of its own to absorb it — kept width it did not need. The panel
+   takes exactly what its columns ask for, up to the cap, and the table lives
+   on what is left. */
+.compare-panel {
+  flex: 0 0 auto;
+  min-width: 232px;
+  max-width: min(620px, 46%);
+  border-color: rgba(var(--accent-rgb), 0.28);
+}
+.compare-panel[hidden] { display: none; }
+.cmp-title { display: flex; align-items: baseline; gap: 8px; }
+.cmp-clear { padding: 3px 9px; font-size: 0.74rem; }
+
+.cmp { width: max-content; min-width: 100%; font-size: 0.8rem; }
+/* Beside only: with the stats down the side, every value is a number under
+   a name and reads right-aligned. Below, the cells keep the alignment they
+   have in the table above — a name left, a number right. */
+.cmp-beside tbody td { text-align: right; }
+
+/* The stat names, down the left. Sticky so they survive scrolling sideways
+   through a long comparison, and therefore opaque: values pass underneath. */
+.cmp .cmp-stat {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--ink-800);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 7px 10px 7px 12px;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* Corner of both sticky axes at once, so it is never crossed by either. */
+.cmp .cmp-corner {
+  left: 0;
+  z-index: 3;
+  background: linear-gradient(180deg, var(--ink-750), var(--ink-800));
+}
+
+.cmp .cmp-head {
+  position: relative;
+  min-width: 118px;
+  padding: 7px 10px 8px 22px;
+  text-align: right;
+  text-transform: none;
+  letter-spacing: 0;
+  vertical-align: bottom;
+}
+.cmp-name {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.cmp-sub {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+}
+/* Dropping one player is the common edit — far more common than clearing the
+   lot — so it lives on the column itself. Quiet until the column is pointed at.*/
+.cmp-drop {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  line-height: 1;
+  font-size: 12px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: transparent;
+}
+.cmp-head:hover .cmp-drop { color: var(--muted); border-color: var(--line); }
+.cmp-drop:focus-visible { color: var(--muted); }
+.cmp-drop:hover { color: var(--accent); border-color: var(--accent); box-shadow: none; }
+
+/* The leading number in a row. A ring rather than another tint: the cell is
+   very likely already carrying a band colour, and a second colour on top of it
+   would be two opinions competing in one square. The ring says "best of these
+   three", the fill still says "good for a defender". */
+.cmp .is-best { box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.7); font-weight: 600; }
+
+/* Six fixtures do not fit across a column this narrow, so the ticker folds to
+   two rows of three instead of setting the width of the whole panel. */
+.cmp .ticker { flex-wrap: wrap; justify-content: flex-end; max-width: 104px; }
+.cmp .tick { min-width: 31px; font-size: 0.58rem; padding: 2px; }
+.cmp .tick::before { font-size: 0.72em; margin-right: 0; }
+
+/* --- The tick box in the explorer --------------------------------------- */
+.cmp-cell { width: 1%; padding-right: 2px; text-align: center; }
+.cmp-box {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  vertical-align: middle;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+/* A ticked row is marked twice over: a wash so it can be found while scrolling,
+   and a bar in the tick column that survives the hover tint on top of it. */
+tbody tr.picked { background: rgba(var(--accent-rgb), 0.07); }
+tbody tr.picked:hover { background: rgba(var(--accent-rgb), 0.12); }
+tbody tr.picked td.cmp-cell { box-shadow: inset 2px 0 0 var(--accent); }
+
+/* --- Below: the split runs across the page ------------------------------
+   The same picks read the other way up — a row per player, under the very
+   columns they came from. What makes it read as one table cut in half rather
+   than two tables that happen to be stacked is that the strip borrows the
+   table's measured column widths and shares its horizontal scroll. */
+.compare-layout.stacked { flex-direction: column; }
+.compare-layout.stacked > .players-panel,
+.compare-layout.stacked > .compare-panel {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+/* Deep enough for a shortlist, never so deep that it crowds out the table it
+   is meant to be read against. */
+.compare-layout.stacked .compare-scroll { max-height: 42vh; }
+
+/* Widths are handed over from the table above, so the layout has to honour
+   them to the pixel rather than re-deciding from the contents of six rows. */
+.cmp-below { table-layout: fixed; font-size: 0.82rem; }
+.cmp-below th, .cmp-below td { overflow: hidden; }
+.cmp-below .cmp-cell { text-align: center; }
+/* A dropped pick is the common edit here too, and with no column heading to
+   hang it off it takes the place of the tick box it came from. */
+.cmp-below .cmp-drop { position: static; color: var(--faint); }
+.cmp-below tr:hover .cmp-drop { color: var(--muted); border-color: var(--line); }
+.cmp-below .is-best { box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.7); }
+
+/* Which way up. A segmented pair rather than a checkbox because neither is a
+   mode of the other — they are two readings of the same picks. */
+.cmp-tools { display: flex; align-items: center; gap: 8px; }
+.cmp-orient { display: inline-flex; }
+.cmp-orient button {
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 0;
+}
+.cmp-orient button:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.cmp-orient button:last-child { border-radius: 0 var(--radius) var(--radius) 0; margin-left: -1px; }
+.cmp-orient button.on {
+  position: relative;
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+}
+
+/* Below this the two halves stop being a split and become a stack: the table
+   needs most of a narrow window on its own. */
+@media (max-width: 1080px) {
+  .compare-layout { flex-direction: column; }
+  .compare-layout > .players-panel,
+  .compare-panel { width: 100%; max-width: none; }
+  /* Forced to stack, the beside panel is what you want in front of you rather
+     than below 650 rows. The below layout is already in its intended order. */
+  .compare-layout:not(.stacked) > .compare-panel { order: -1; }
 }
 
 /* --- Responsive --------------------------------------------------------- */

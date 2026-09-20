@@ -7,7 +7,8 @@
    markup. Each is the header's tooltip, and app.js lends the same text to every
    cell in the column so a value 400 rows down can still say what it is. #}
 {% set help = {
-  'player': 'The player\'s FPL short name; hover for the full name.\nThe caret opens their club\'s and their own record against each of the next six opponents.',
+  'cmp':    'Tick to compare. The first tick splits the page in two, and the panel takes either reading: Below lines the ticked players up as rows under the table, in its own columns and sharing its sideways scroll; Beside stands them on their side next to it, a column each and a row per stat.\nA number is marked when it is the best of the ticked players — only where they actually differ, and only for stats where more is better, so £m and Own % are never crowned.\nTicks survive sorting and filtering: narrow the table right down to find the next player without losing the ones already in the panel.',
+  'player': 'The player\'s FPL short name; hover for the full name.\nThe caret opens this season game by game — goals, assists, DefCon, saves and points per match — then their club\'s and their own record against each of the next six opponents.',
   'pos':    'Position: GKP, DEF, MID or FWD.\nEvery coloured band on this row is cut against other players in this position, not against the whole game.',
   'team':   'Club, by three-letter code.',
   'next6':  'The next six fixtures, earliest first.\nColour is FPL\'s own difficulty rating, 1 (easy) to 5 (hard). 🏠 home, ✈️ away.\nFewer than six cells means fewer fixtures — a blank gameweek.',
@@ -43,124 +44,157 @@
 <div class="notice">
   <span class="band-key"><span class="chip b-good">good</span><span class="chip b-avg">average</span><span class="chip b-bad">below average</span><span class="chip b-thin">too soon to say</span></span>
   Each number is graded against others <strong>in the same position</strong>.
-  Open the <span class="caret-key">▾</span> next to a name for the history behind the
-  fixtures: how the player's club has done against each of the next six opponents,
-  and what the player himself did in those games.
+  Open the <span class="caret-key">▾</span> next to a name for what the rates are made
+  of: this season match by match, then how the player's club has done against each of
+  the next six opponents and what the player did in those games.
+  Tick <span class="caret-key">vs</span> on two or three rows to stand them side by
+  side — as rows under the table, or as columns beside it.
 </div>
 
-<div class="panel">
-  <div class="filters">
-    <label class="field">Search
-      <input type="search" placeholder="name…" data-filter-for="player-table" data-filter-key="name" data-filter-mode="contains">
-    </label>
-    <label class="field">Position
-      <select data-filter-for="player-table" data-filter-key="pos" data-filter-mode="equals">
-        <option value="">All</option>
-        <option value="GKP">Goalkeepers</option>
-        <option value="DEF">Defenders</option>
-        <option value="MID">Midfielders</option>
-        <option value="FWD">Forwards</option>
-      </select>
-    </label>
-    <label class="field">Team
-      <select data-filter-for="player-table" data-filter-key="team" data-filter-mode="equals">
-        <option value="">All</option>
-        {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-      </select>
-    </label>
-    <label class="field">Max £m
-      <input type="number" step="0.1" min="3.5" max="16" placeholder="any" style="width:74px"
-             data-filter-for="player-table" data-filter-key="price" data-filter-mode="max">
-    </label>
-    <label class="field">Min minutes
-      <input type="number" step="90" min="0" placeholder="0" style="width:74px"
-             data-filter-for="player-table" data-filter-key="minutes" data-filter-mode="min">
-    </label>
-    <label class="field">Squad
-      <select data-filter-for="player-table" data-filter-key="owned" data-filter-mode="equals">
-        <option value="">Everyone</option>
-        <option value="1">Mine only</option>
-        <option value="0">Not owned</option>
-      </select>
-    </label>
-    <label class="field">Max own %
-      <input type="number" step="1" min="0" max="100" placeholder="any" style="width:74px"
-             data-filter-for="player-table" data-filter-key="own" data-filter-mode="max">
-    </label>
-    <span class="spacer"></span>
-    <span class="result-count" data-count-for="player-table"></span>
+<div class="compare-layout" data-compare-layout>
+  <div class="panel players-panel">
+    <div class="filters">
+      <label class="field">Search
+        <input type="search" placeholder="name…" data-filter-for="player-table" data-filter-key="name" data-filter-mode="contains">
+      </label>
+      <label class="field">Position
+        <select data-filter-for="player-table" data-filter-key="pos" data-filter-mode="equals">
+          <option value="">All</option>
+          <option value="GKP">Goalkeepers</option>
+          <option value="DEF">Defenders</option>
+          <option value="MID">Midfielders</option>
+          <option value="FWD">Forwards</option>
+        </select>
+      </label>
+      <label class="field">Team
+        <select data-filter-for="player-table" data-filter-key="team" data-filter-mode="equals">
+          <option value="">All</option>
+          {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="field">Max £m
+        <input type="number" step="0.1" min="3.5" max="16" placeholder="any" style="width:74px"
+               data-filter-for="player-table" data-filter-key="price" data-filter-mode="max">
+      </label>
+      <label class="field">Min minutes
+        <input type="number" step="90" min="0" placeholder="0" style="width:74px"
+               data-filter-for="player-table" data-filter-key="minutes" data-filter-mode="min">
+      </label>
+      <label class="field">Squad
+        <select data-filter-for="player-table" data-filter-key="owned" data-filter-mode="equals">
+          <option value="">Everyone</option>
+          <option value="1">Mine only</option>
+          <option value="0">Not owned</option>
+        </select>
+      </label>
+      <label class="field">Max own %
+        <input type="number" step="1" min="0" max="100" placeholder="any" style="width:74px"
+               data-filter-for="player-table" data-filter-key="own" data-filter-mode="max">
+      </label>
+      <span class="spacer"></span>
+      <span class="result-count" data-count-for="player-table"></span>
+    </div>
+
+    <div class="table-scroll fill">
+      {# The base of the per-player history endpoint; the id is appended in JS. #}
+      <table data-sortable id="player-table"
+             data-opponents-base="{{ url_for('main.player_opponents', player_id=0) | replace('/0/opponents', '') }}">
+        <thead>
+          <tr>
+            <th class="cmp-cell" data-nosort data-compare-skip title="{{ help.cmp }}">vs</th>
+            <th data-type="text" data-compare-skip title="{{ help.player }}">Player</th>
+            <th data-type="text" data-compare-skip title="{{ help.pos }}">Pos</th>
+            <th data-type="text" data-compare-skip title="{{ help.team }}">Team</th>
+            <th data-nosort title="{{ help.next6 }}">Next 6</th>
+            <th class="num" title="{{ help.price }}">£m</th>
+            <th class="num" data-best="high" title="{{ help.ep }}">EP</th>
+            <th class="num" data-best="high" title="{{ help.xpts }}">xPts</th>
+            <th class="num" data-best="high" title="{{ help.xpts6 }}">xPts 6</th>
+            <th class="num" data-best="high" title="{{ help.pts }}">Pts</th>
+            <th class="num" data-best="high" title="{{ help.form }}">Form</th>
+            <th class="num" title="{{ help.own }}">Own %</th>
+            <th class="num" data-best="high" title="{{ help.xg90 }}">xG/90</th>
+            <th class="num" data-best="high" title="{{ help.xa90 }}">xA/90</th>
+            <th class="num" data-best="high" title="{{ help.g90 }}">G/90</th>
+            <th class="num" data-best="high" title="{{ help.a90 }}">A/90</th>
+            <th class="num" data-best="high" title="{{ help.ppg }}">PPG</th>
+            <th class="num" data-best="high" title="{{ help.minst }}">Min/st</th>
+            <th class="num" data-best="high" title="{{ help.dc90 }}">DC/90</th>
+            <th class="num" data-best="high" title="{{ help.dcrel }}">DC rel.</th>
+            <th data-nosort title="{{ help.status }}">St</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in players %}
+          <tr data-name="{{ p.full_name }} {{ p.name }}" data-pos="{{ p.position }}" data-team="{{ p.team }}"
+              data-price="{{ p.price }}" data-minutes="{{ p.minutes }}" data-own="{{ p.ownership }}"
+              data-owned="{{ 1 if p.owned else 0 }}" data-player="{{ p.id }}">
+            <td class="cmp-cell">
+              <input type="checkbox" class="cmp-box" data-compare
+                     aria-label="Compare {{ p.full_name }}" title="Compare {{ p.name }}">
+            </td>
+            {# The caret is inside the cell so the column count is unchanged; the
+               sort key is set explicitly so its glyph never reaches the sorter. #}
+            <td class="name" title="{{ p.full_name }}" data-sort="{{ p.name }}">
+              <button type="button" class="caret" data-expand aria-expanded="false"
+                      title="This season match by match, and the record against the next six opponents">▾</button>{{ p.name }}{% if p.owned %} <span class="badge accent" title="In the selected squad">owned</span>{% endif %}
+            </td>
+            <td><span class="pos">{{ p.position }}</span></td>
+            <td><span class="team-tag">{{ p.team }}</span></td>
+            <td>{{ ticker(p.fixtures) }}</td>
+            <td class="num">{{ '%.1f' % p.price }}</td>
+            <td class="num {{ p.bands.ep_next }}">{{ p.ep_next }}</td>
+            <td class="num {{ p.bands.xpts_next }}"><strong>{{ '%.2f' % p.xpts_next }}</strong></td>
+            <td class="num {{ p.bands.xpts_horizon }}">{{ '%.1f' % p.xpts_horizon }}</td>
+            <td class="num {{ p.bands.total_points }}">{{ p.total_points }}</td>
+            <td class="num {{ p.bands.form }}">{{ p.form }}</td>
+            <td class="num">{{ p.ownership }}</td>
+            <td class="num {{ p.bands.xg90 }}">{{ '%.2f' % p.xg90 }}</td>
+            <td class="num {{ p.bands.xa90 }}">{{ '%.2f' % p.xa90 }}</td>
+            <td class="num {{ p.bands.goals90 }}">{{ '%.2f' % p.goals90 }}</td>
+            <td class="num {{ p.bands.assists90 }}">{{ '%.2f' % p.assists90 }}</td>
+            <td class="num {{ p.bands.ppg }}">{{ p.ppg }}</td>
+            {# Sorts on 0 but reads as a dash: nobody has "0 minutes per start". #}
+            <td class="num {{ p.bands.mins_per_start }}" data-sort="{{ p.mins_per_start }}">
+              {% if p.starts %}{{ '%.0f' % p.mins_per_start }}{% else %}<span class="miss">—</span>{% endif %}
+            </td>
+            <td class="num {{ p.bands.defcon90 }}">{{ '%.1f' % p.defcon90 }}</td>
+            {# Sorts below every real rate when the sample is too thin to trust. #}
+            <td class="num {{ p.bands.defcon_reliability }}"
+                data-sort="{{ p.defcon_reliability if (p.defcon_reliability is not none and p.defcon_sample >= 5) else -1 }}"
+                title="{% if p.defcon_sample %}{{ p.defcon_sample }} game{{ '' if p.defcon_sample == 1 else 's' }} of 60+ minutes, needs {{ p.defcon_threshold }} actions{% if p.defcon_sample < 5 %} — too few to trust{% endif %}{% else %}No sample{% endif %}">
+              {% if p.defcon_reliability is not none %}{{ '%.0f%%' % (p.defcon_reliability * 100) }}<span class="miss" style="font-size:0.85em">/{{ p.defcon_sample }}</span>{% else %}<span class="miss">—</span>{% endif %}
+            </td>
+            <td class="status-cell">{{ flag_icon(p.status, p.news, p.chance) }}{% if p.crowd and p.crowd.availability not in ('unknown','fit') %}<span class="stat-icon crowd" title="Crowd intel: {{ p.crowd.availability }} — {{ p.crowd.reasons | join(' · ') }}">◆</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="table-scroll fill">
-    {# The base of the per-player history endpoint; the id is appended in JS. #}
-    <table data-sortable id="player-table"
-           data-opponents-base="{{ url_for('main.player_opponents', player_id=0) | replace('/0/opponents', '') }}">
-      <thead>
-        <tr>
-          <th data-type="text" title="{{ help.player }}">Player</th>
-          <th data-type="text" title="{{ help.pos }}">Pos</th>
-          <th data-type="text" title="{{ help.team }}">Team</th>
-          <th data-nosort title="{{ help.next6 }}">Next 6</th>
-          <th class="num" title="{{ help.price }}">£m</th>
-          <th class="num" title="{{ help.ep }}">EP</th>
-          <th class="num" title="{{ help.xpts }}">xPts</th>
-          <th class="num" title="{{ help.xpts6 }}">xPts 6</th>
-          <th class="num" title="{{ help.pts }}">Pts</th>
-          <th class="num" title="{{ help.form }}">Form</th>
-          <th class="num" title="{{ help.own }}">Own %</th>
-          <th class="num" title="{{ help.xg90 }}">xG/90</th>
-          <th class="num" title="{{ help.xa90 }}">xA/90</th>
-          <th class="num" title="{{ help.g90 }}">G/90</th>
-          <th class="num" title="{{ help.a90 }}">A/90</th>
-          <th class="num" title="{{ help.ppg }}">PPG</th>
-          <th class="num" title="{{ help.minst }}">Min/st</th>
-          <th class="num" title="{{ help.dc90 }}">DC/90</th>
-          <th class="num" title="{{ help.dcrel }}">DC rel.</th>
-          <th data-nosort title="{{ help.status }}">St</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in players %}
-        <tr data-name="{{ p.full_name }} {{ p.name }}" data-pos="{{ p.position }}" data-team="{{ p.team }}"
-            data-price="{{ p.price }}" data-minutes="{{ p.minutes }}" data-own="{{ p.ownership }}"
-            data-owned="{{ 1 if p.owned else 0 }}" data-player="{{ p.id }}">
-          {# The caret is inside the cell so the column count is unchanged; the
-             sort key is set explicitly so its glyph never reaches the sorter. #}
-          <td class="name" title="{{ p.full_name }}" data-sort="{{ p.name }}">
-            <button type="button" class="caret" data-expand aria-expanded="false"
-                    title="Record against the next six opponents">▾</button>{{ p.name }}{% if p.owned %} <span class="badge accent" title="In the selected squad">owned</span>{% endif %}
-          </td>
-          <td><span class="pos">{{ p.position }}</span></td>
-          <td><span class="team-tag">{{ p.team }}</span></td>
-          <td>{{ ticker(p.fixtures) }}</td>
-          <td class="num">{{ '%.1f' % p.price }}</td>
-          <td class="num {{ p.bands.ep_next }}">{{ p.ep_next }}</td>
-          <td class="num {{ p.bands.xpts_next }}"><strong>{{ '%.2f' % p.xpts_next }}</strong></td>
-          <td class="num {{ p.bands.xpts_horizon }}">{{ '%.1f' % p.xpts_horizon }}</td>
-          <td class="num {{ p.bands.total_points }}">{{ p.total_points }}</td>
-          <td class="num {{ p.bands.form }}">{{ p.form }}</td>
-          <td class="num">{{ p.ownership }}</td>
-          <td class="num {{ p.bands.xg90 }}">{{ '%.2f' % p.xg90 }}</td>
-          <td class="num {{ p.bands.xa90 }}">{{ '%.2f' % p.xa90 }}</td>
-          <td class="num {{ p.bands.goals90 }}">{{ '%.2f' % p.goals90 }}</td>
-          <td class="num {{ p.bands.assists90 }}">{{ '%.2f' % p.assists90 }}</td>
-          <td class="num {{ p.bands.ppg }}">{{ p.ppg }}</td>
-          {# Sorts on 0 but reads as a dash: nobody has "0 minutes per start". #}
-          <td class="num {{ p.bands.mins_per_start }}" data-sort="{{ p.mins_per_start }}">
-            {% if p.starts %}{{ '%.0f' % p.mins_per_start }}{% else %}<span class="miss">—</span>{% endif %}
-          </td>
-          <td class="num {{ p.bands.defcon90 }}">{{ '%.1f' % p.defcon90 }}</td>
-          {# Sorts below every real rate when the sample is too thin to trust. #}
-          <td class="num {{ p.bands.defcon_reliability }}"
-              data-sort="{{ p.defcon_reliability if (p.defcon_reliability is not none and p.defcon_sample >= 5) else -1 }}"
-              title="{% if p.defcon_sample %}{{ p.defcon_sample }} game{{ '' if p.defcon_sample == 1 else 's' }} of 60+ minutes, needs {{ p.defcon_threshold }} actions{% if p.defcon_sample < 5 %} — too few to trust{% endif %}{% else %}No sample{% endif %}">
-            {% if p.defcon_reliability is not none %}{{ '%.0f%%' % (p.defcon_reliability * 100) }}<span class="miss" style="font-size:0.85em">/{{ p.defcon_sample }}</span>{% else %}<span class="miss">—</span>{% endif %}
-          </td>
-          <td class="status-cell">{{ flag_icon(p.status, p.news, p.chance) }}{% if p.crowd and p.crowd.availability not in ('unknown','fit') %}<span class="stat-icon crowd" title="Crowd intel: {{ p.crowd.availability }} — {{ p.crowd.reasons | join(' · ') }}">◆</span>{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {# Built entirely in the browser from the rows already on the page: the numbers
+     in the panel are the same cells, bands and all, stood on their side. Nothing
+     is fetched, so a comparison costs no round trip and survives a filter. #}
+  <aside class="panel compare-panel" data-compare-panel hidden>
+    <div class="panel-head">
+      <h3 class="cmp-title">Side by side <span class="detail-note" data-compare-count></span></h3>
+      <div class="cmp-tools">
+        {# Two readings of the same picks. Beside keeps the table's full height
+           and turns the players on their side; below keeps the table's columns
+           and lines the players up under them, sharing its horizontal scroll. #}
+        <span class="cmp-orient" role="group" aria-label="Comparison layout">
+          <button type="button" data-orient="rows"
+                  title="Under the table, a row per player, columns lined up with the table above">Below</button>
+          <button type="button" data-orient="columns"
+                  title="Beside the table, a column per player, a row per stat">Beside</button>
+        </span>
+        <button type="button" class="cmp-clear" data-compare-clear>Clear</button>
+      </div>
+    </div>
+    <div class="table-scroll fill compare-scroll">
+      <table class="cmp" data-compare-table></table>
+    </div>
+  </aside>
 </div>
 {% endblock %}

@@ -29,7 +29,7 @@ Linux install, with Pi-specific notes where the two differ.
 | **My Squads** (`/`) | Your current squad on a pitch, in real club kits, split into keeper / defence / midfield / attack. Per player: what they actually scored that gameweek, their projection, fixture difficulty and availability. Up top: the next transfer deadline, what the squad scored, and what the XI is projected to score next. |
 | **My Stats** (`/stats`) | Gameweek points and ranks, plus your position in every classic league you've joined. |
 | **Squad Builder** (`/builder`) | Two sections. First, the strongest **seven options in each position** for the next ten gameweeks (or however many are left), ranked on what they have been scoring, the difficulty of the run ahead, this app's xPts and FPL's own EP. Second, **what your YouTube creators are saying**: who each of them is telling you to buy, sell, keep, start or captain, in your configured trust order. Both halves describe a player with the same figures: club, price, the fixture run, points per game, minutes per game, xG per game and xA per game. |
-| **Player Stats** (`/players`) | Every player, sortable and filterable, with the underlying numbers: xG, xA, xGI, xGC, DefCon reliability, minutes, form, price, ownership and points per million. Each row opens on a per-opponent history, described below. |
+| **Player Stats** (`/players`) | Every player, sortable and filterable, with the underlying numbers: xG, xA, xGI, xGC, DefCon reliability, minutes, form, price, ownership and points per million. Each row opens on this season match by match and a per-opponent history, and any two or more rows can be ticked into a side-by-side panel. Both are described below. |
 
 Matches is the one page with no team selector, because it is about the league
 rather than about you. Every other page carries its own **team selector** at the
@@ -40,20 +40,80 @@ and can filter down to them.
 The fixture ticker, six cells coloured by FPL difficulty, appears throughout;
 italics mean an away fixture.
 
-### The history behind the fixtures
+### What the caret opens
 
-The caret next to a name on Player Stats opens two rows of context for the next
-six fixtures, fetched on demand rather than shipped with the table:
+The caret next to a name on Player Stats opens three blocks of context, fetched
+on demand rather than shipped with the table:
 
-* **The club's record**: up to the last five meetings with each upcoming
-  opponent, as a result and a scoreline.
+* **This season, game by game**: every match the club has played, oldest first,
+  with the opponent and the scoreline, then minutes, goals, assists, DefCon,
+  saves, clean sheet, goals conceded, bonus and the points that came out of it,
+  and the season's totals underneath. Every column in the table above is a
+  season-long rate, and a rate hides its own shape: 0.4 goals per 90 is the
+  same number whether it is a goal every other week or four in one afternoon
+  and nothing since.
+* **The club's record**: up to the last five meetings with each of the next six
+  opponents, as a result and a scoreline.
 * **The player's own record**: goals, assists and defensive contributions in
-  the games he actually played against them, with the minutes behind each.
+  the games actually played against them, with the minutes behind each.
+
+Only the columns a position is scored on are drawn: saves for goalkeepers, the
+DefCon count for everyone else, and no clean sheet column for forwards. A game
+the player watched keeps its row, because a run of blanks is how rotation and a
+knock look before they reach the news feed, but its numbers are dashed rather
+than zeroed: 0 goals from the bench is not a quiet afternoon on the pitch.
+Anything that returned is picked out in amber, including the DefCon shifts that
+actually cleared the threshold and banked the two points.
 
 A club that has no history against an opponent says so, and says *why*: newly
 promoted sides (either your player's club or the opponent) are reported as new
 to the league rather than as a blank run of results. DefCon only exists from
 2025/26, so earlier meetings show a dash rather than a zero.
+
+**Where the log's numbers come from.** The list of gameweeks is the club's
+finished fixtures, so every week that has been played is listed for every
+player: it is deliberately *not* built from the player's own history rows.
+Element summaries are fetched on a per-player budget, and around half the game
+is carrying a single history row from whenever that player was last picked up;
+building the log out of those rows would silently drop the gameweeks nobody had
+fetched, and show a player who scored in GW2 a season with no GW2 in it.
+
+Each fixture is then filled from the best source that has it. Goals, assists,
+saves, bonus and cards come from `fixture_stats`, which is complete for every
+fixture and every player, so they are real numbers on every row. Minutes,
+DefCon, clean sheets, goals conceded and the match's points only exist in
+`player_gw_history`; where that has not been fetched yet the row is hatched and
+those cells carry a `?` rather than a nought nobody earned. The totals line is
+taken from FPL's own season figures rather than summed from the log, so it
+agrees with the Pts column in the table above even while a row is still waiting
+to be filled in.
+
+### Comparing players side by side
+
+Twenty columns down six hundred rows is a good way to find a player and a poor
+way to choose between two: the pair you are weighing up are forty rows apart,
+and picking between them means scrolling back and forth holding six numbers in
+your head. The **vs** column ticks a row into a comparison panel instead.
+
+The first tick splits the page, and the panel takes either reading. **Below**
+lines the ticked players up as rows under the table, in its own columns and
+sharing its sideways scroll. **Beside** stands them on their side next to it, a
+column each and a row per stat. Which one you picked is remembered.
+
+A number is marked when it is the best of the ticked players, but only where
+they actually differ, and only for stats that have a better end: £m and Own %
+are never crowned, for the same reason they carry no colour band in the table,
+and neither is a fixture run. One player is not a contest, so nothing is marked
+until a second is ticked; genuine ties are all marked.
+
+Ticks survive sorting and filtering, so you can narrow the table right down to
+find the next player without losing the ones already in the panel, and the
+order is the order you ticked in rather than the table's, so a player never
+moves under the cursor because someone further up was added after them. The
+panel is session-scoped: it survives the reload that a background refresh
+triggers, and is forgotten when the tab closes. Nothing in it is fetched, since
+every value is the very cell from the table above, colour band and tooltip and
+all.
 
 ---
 
