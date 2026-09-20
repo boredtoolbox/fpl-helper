@@ -128,9 +128,12 @@ Grab the file for your machine from
 | Your machine | File |
 | --- | --- |
 | Windows | `fpl-helper-windows-x86_64.exe` |
-| Mac, Apple Silicon (M1 and later) | `fpl-helper-macos-arm64` |
-| Mac, Intel | `fpl-helper-macos-x86_64` |
+| Mac (Apple Silicon — M1 and later) | `fpl-helper-macos-arm64` |
 | Linux | `fpl-helper-linux-x86_64` |
+
+There is no Intel Mac build. Those CI runners are scarce enough to hold up
+every release, and every Mac sold since 2020 is Apple Silicon — on an older
+one, use the source install below.
 
 Run it, and a browser opens on a short setup page: your FPL team id, and
 optionally a Gemini key. It fetches everything else itself and refreshes daily

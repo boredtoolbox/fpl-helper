@@ -20,10 +20,12 @@ jobs:
           - os: ubuntu-22.04     # oldest supported glibc, so it runs on older distros too
             label: linux-x86_64
             artifact: fpl-helper-linux-x86_64
-          - os: macos-13         # Intel
-            label: macos-x86_64
-            artifact: fpl-helper-macos-x86_64
-          - os: macos-14         # Apple Silicon
+          # Apple Silicon only. An Intel (macos-13) target was dropped: those
+          # runners are scarce enough that the job sat queued while every
+          # other platform finished, and the release gate would then be
+          # hostage to it. Every Mac sold since 2020 is arm64; Intel owners
+          # can use the source install.
+          - os: macos-14
             label: macos-arm64
             artifact: fpl-helper-macos-arm64
           - os: windows-latest
