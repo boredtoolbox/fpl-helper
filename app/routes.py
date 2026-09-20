@@ -48,6 +48,10 @@ def _selected_team(cfg) -> int | None:
 def inject_globals():
     """Freshness and the selected team are needed by every page."""
     cfg = _cfg()
+    if cfg.needs_setup:
+        # The setup pages do not use any of this, and before a team is
+        # configured there is nothing in the database to report anyway.
+        return {}
     conn = _conn()
     try:
         # active_job sees cron's process too; REFRESH_LOCK only sees this one.

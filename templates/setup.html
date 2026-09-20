@@ -1,0 +1,93 @@
+{#
+  First-run setup. Standalone rather than extending base.html: the shared
+  layout is a team selector, a gameweek strip and a refresh button, none of
+  which mean anything before there is a team or any data to refresh.
+#}
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up FPL Helper</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>⚽</text></svg>">
+<style>
+  .setup { max-width: 620px; margin: 0 auto; padding: 56px 20px 80px; }
+  .setup h1 { font-size: 1.6rem; margin: 0 0 6px; }
+  .setup .lede { color: var(--muted); margin: 0 0 30px; line-height: 1.55; }
+  .setup-field { margin: 0 0 24px; }
+  .setup-field label { display: block; font-weight: 600; margin-bottom: 5px; }
+  .setup-field input { width: 100%; padding: 9px 11px; font-size: 1rem; }
+  .setup-field .hint { color: var(--muted); font-size: 0.85rem; margin-top: 6px; line-height: 1.5; }
+  .setup-optional { font-weight: 400; color: var(--faint); font-size: 0.85rem; }
+  .setup-errors { list-style: none; margin: 0 0 24px; padding: 0; }
+  .setup-errors li {
+    border: 1px solid rgba(var(--fdr-5-rgb), 0.5);
+    background: rgba(var(--fdr-5-rgb), 0.12);
+    border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; line-height: 1.5;
+  }
+  .setup-actions { margin-top: 30px; }
+  .setup-actions button { padding: 10px 20px; font-size: 1rem; }
+  .setup-note { color: var(--faint); font-size: 0.85rem; margin-top: 26px; line-height: 1.55; }
+</style>
+</head>
+<body>
+<div class="setup">
+
+  <h1><span style="color:var(--accent-2)">◆</span> FPL Helper</h1>
+  <p class="lede">
+    Two questions and it will fetch everything it needs. Both answers are
+    stored on this machine only.
+  </p>
+
+  {% if errors %}
+  <ul class="setup-errors">
+    {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('setup.setup') }}">
+
+    <div class="setup-field">
+      <label for="team_ids">Your FPL team id</label>
+      <input type="text" id="team_ids" name="team_ids" value="{{ team_raw }}"
+             placeholder="1234567" autofocus required>
+      <p class="hint">
+        Log in at fantasy.premierleague.com and open <strong>Points</strong>.
+        The address bar reads <code>/entry/<strong>1234567</strong>/event/…</code>
+        — that number is your team id. Pasting the whole URL works too. More
+        than one team? Separate them with commas.
+      </p>
+    </div>
+
+    <div class="setup-field">
+      <label for="gemini_key">
+        Gemini API key <span class="setup-optional">— optional</span>
+      </label>
+      <input type="password" id="gemini_key" name="gemini_key"
+             placeholder="AIza…" autocomplete="off" spellcheck="false">
+      <p class="hint">
+        Only used to read what FPL creators are saying on YouTube and in the
+        press. Leave it blank and everything else still works — the projections
+        are pure maths and do not involve it at all.
+        Get your own free key at
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">
+          aistudio.google.com/apikey</a>. It must be yours; keys are per-person
+        and come with their own quota.
+      </p>
+    </div>
+
+    <div class="setup-actions">
+      <button type="submit" class="btn-accent">Set up and fetch data</button>
+    </div>
+  </form>
+
+  <p class="setup-note">
+    The first fetch takes 10-15 minutes, nearly all of it walking the FPL API
+    at one request per second. After that it refreshes itself once a day and
+    takes seconds.
+  </p>
+
+</div>
+</body>
+</html>

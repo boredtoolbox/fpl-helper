@@ -18,6 +18,10 @@ logs/
 # Tests (kept local only)
 tests/
 
+# PyInstaller output (the spec file itself IS tracked)
+build/
+dist/
+
 # Python
 __pycache__/
 *.py[cod]

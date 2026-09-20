@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from .config import Config, PROJECT_ROOT, load_config
+from .config import Config, IMAGE_ROOT, load_config
 from .db import (
     ACTIVE_JOB_KEY, REFRESH_LOCK, connect, get_meta, init_db, jdump, log_fetch,
     set_meta, utcnow,
@@ -323,7 +323,7 @@ def run_refresh(cfg: Config | None = None, *, force_historical: bool = False) ->
                 log.info("historical dataset is %.1f days old — skipping (weekly)", age)
                 return {"skipped": True, "age_days": round(age, 1)}
             return historical.sync_historical(
-                conn, cfg.historical_repo_dir, cfg.historical_seasons
+                conn, cfg.historical_data_dir, cfg.historical_seasons
             )
 
         _stage(conn, results, "historical", maybe_historical)
@@ -335,8 +335,8 @@ def run_refresh(cfg: Config | None = None, *, force_historical: bool = False) ->
         _stage(
             conn, results, "images",
             lambda: {
-                "kits": kits.sync_kits(conn, PROJECT_ROOT / "static"),
-                "crests": kits.sync_crests(conn, PROJECT_ROOT / "static"),
+                "kits": kits.sync_kits(conn, IMAGE_ROOT),
+                "crests": kits.sync_crests(conn, IMAGE_ROOT),
             },
         )
         conn.commit()
@@ -452,7 +452,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", help="path to config.yaml")
     parser.add_argument(
         "--force-historical", action="store_true",
-        help="re-pull the historical dataset even if it was synced recently",
+        help="re-fetch the historical dataset even if it was synced recently",
     )
     parser.add_argument("--quiet", action="store_true", help="warnings and errors only")
     args = parser.parse_args(argv)

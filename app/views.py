@@ -354,10 +354,10 @@ def squad_for(conn: sqlite3.Connection, team_id: int, event: int | None = None) 
         )
     }
 
-    from .config import PROJECT_ROOT
+    from .config import IMAGE_ROOT
     from .services.kits import have_kit, kit_name
 
-    static_dir = PROJECT_ROOT / "static"
+    static_dir = IMAGE_ROOT
     for pick in picks:
         pick["position_name"] = POSITION_NAMES.get(pick["element_type"], "?")
         pick["price"] = (pick["now_cost"] or 0) / 10.0
@@ -690,10 +690,10 @@ def _side(team: dict[str, Any] | None, score: Any, difficulty: Any) -> dict[str,
 
 def match_day(conn: sqlite3.Connection, event: int) -> dict[str, Any]:
     """One gameweek's fixtures, with scorers and assists where they exist."""
-    from .config import PROJECT_ROOT
+    from .config import IMAGE_ROOT
     from .services.kits import crest_name, have_crest
 
-    static_dir = PROJECT_ROOT / "static"
+    static_dir = IMAGE_ROOT
     teams = {
         r["id"]: {
             "id": r["id"],

@@ -1,0 +1,127 @@
+{# The first refresh, watched. Standalone for the same reason as setup.html. #}
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fetching your data — FPL Helper</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>⚽</text></svg>">
+<style>
+  .setup { max-width: 620px; margin: 0 auto; padding: 72px 20px 80px; }
+  .setup h1 { font-size: 1.5rem; margin: 0 0 8px; }
+  .setup .lede { color: var(--muted); margin: 0 0 32px; line-height: 1.55; }
+  .stage {
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--ink-800); padding: 16px 18px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .spinner {
+    width: 15px; height: 15px; flex: none; border-radius: 50%;
+    border: 2px solid rgba(var(--accent-rgb), 0.25);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* Anyone who has asked not to see motion gets a static ring instead. */
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+  .stage-name { font-weight: 600; }
+  .stage-sub { color: var(--muted); font-size: 0.86rem; margin-top: 2px; }
+  .setup-note { color: var(--faint); font-size: 0.85rem; margin-top: 26px; line-height: 1.55; }
+  .failed {
+    border-color: rgba(var(--fdr-5-rgb), 0.5);
+    background: rgba(var(--fdr-5-rgb), 0.12);
+  }
+  .failed .spinner { display: none; }
+</style>
+</head>
+<body>
+<div class="setup">
+
+  <h1><span style="color:var(--accent-2)">◆</span> Fetching your data</h1>
+  <p class="lede" id="teams" hidden></p>
+  <p class="lede">
+    Ten to fifteen minutes the first time. Nearly all of it is one stage —
+    every player's match history, fetched from the FPL API at one request per
+    second rather than hammering a free service. Leave this page open.
+  </p>
+
+  <div class="stage" id="stage">
+    <div class="spinner" id="spinner"></div>
+    <div>
+      <div class="stage-name" id="stage-name">Starting…</div>
+      <div class="stage-sub" id="stage-sub">This page updates itself.</div>
+    </div>
+  </div>
+
+  <p class="setup-note">
+    Fetching the squads, every player's history, the fixture list, past-season
+    results and the club kits. It only happens in full once.
+  </p>
+
+</div>
+
+<script>
+(function () {
+  var statusUrl = "{{ url_for('setup.setup_status') }}";
+  var box = document.getElementById('stage');
+  var name = document.getElementById('stage-name');
+  var sub = document.getElementById('stage-sub');
+
+  // Stage keys are whatever refresh.py passes to _stage(); anything not named
+  // here still shows, just with its raw key.
+  var LABELS = {
+    bootstrap: 'Players, teams and gameweeks',
+    fixtures: 'Fixtures and results',
+    my_teams: 'Your squads',
+    element_summaries: 'Every player’s match history',
+    historical: 'Past seasons',
+    projections: 'Building projections',
+    images: 'Club kits and crests',
+    retention: 'Tidying up'
+  };
+
+  var teamsEl = document.getElementById('teams');
+  var teamsShown = false;
+
+  function poll() {
+    fetch(statusUrl, { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        // Read the team name back so a typo that happens to be a real entry
+        // id is caught here rather than after the whole fetch.
+        if (!teamsShown && d.teams && d.teams.length) {
+          teamsEl.textContent = 'Setting up ' + d.teams.join(', ') + '.';
+          teamsEl.hidden = false;
+          teamsShown = true;
+        }
+        if (d.state === 'done') {
+          name.textContent = 'Done — opening your squad…';
+          sub.textContent = '';
+          window.location.href = "{{ url_for('main.squads') }}";
+          return;
+        }
+        if (d.state === 'failed') {
+          box.classList.add('failed');
+          name.textContent = 'That did not finish';
+          sub.textContent = (d.error || 'Unknown error') +
+            ' — the log is in the logs folder next to your data.';
+          return;
+        }
+        if (d.stage) {
+          name.textContent = LABELS[d.stage] || d.stage;
+          sub.textContent = 'Still going. This page updates itself.';
+        }
+        setTimeout(poll, 1500);
+      })
+      .catch(function () {
+        // A refresh can saturate a Pi for a moment; a missed poll is not a
+        // failure, so just try again rather than reporting one.
+        setTimeout(poll, 3000);
+      });
+  }
+  poll();
+})();
+</script>
+</body>
+</html>

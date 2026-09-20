@@ -117,11 +117,86 @@ all.
 
 ---
 
+## Download and run it (no Python needed)
+
+For running it on your own laptop. If you want it on a server or a Pi, skip to
+[Install on Linux](#install-on-linux) — that is still the better route there.
+
+Grab the file for your machine from
+[Releases](https://github.com/boredtoolbox/fpl-helper/releases):
+
+| Your machine | File |
+| --- | --- |
+| Windows | `fpl-helper-windows-x86_64.exe` |
+| Mac, Apple Silicon (M1 and later) | `fpl-helper-macos-arm64` |
+| Mac, Intel | `fpl-helper-macos-x86_64` |
+| Linux | `fpl-helper-linux-x86_64` |
+
+Run it, and a browser opens on a short setup page: your FPL team id, and
+optionally a Gemini key. It fetches everything else itself and refreshes daily
+at 6am from then on. No Python, no virtualenv, no cron, no config file to
+edit.
+
+### Getting past the security warning
+
+These binaries are **not signed**, because a certificate costs $99/year from
+Apple and a few hundred more for Windows. Your operating system will therefore
+stop the first run:
+
+* **macOS** — right-click the file and choose *Open*, then *Open* again.
+  Double-clicking gives you no way past the warning. From a terminal you may
+  also need `chmod +x fpl-helper-macos-arm64` and
+  `xattr -d com.apple.quarantine fpl-helper-macos-arm64`.
+* **Windows** — SmartScreen says "Windows protected your PC". Choose
+  *More info*, then *Run anyway*. Some antivirus products dislike
+  single-file Python builds on principle and may quarantine it.
+* **Linux** — `chmod +x fpl-helper-linux-x86_64` and run it.
+
+If that trade is not one you want to make, the source install below involves
+no unsigned binaries at all.
+
+### Where it keeps things
+
+Not next to the executable — a one-file build unpacks into a temporary
+directory that is deleted when it exits. Your config, database and logs go to:
+
+| | |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%\fpl-helper` |
+| macOS | `~/Library/Application Support/fpl-helper` |
+| Linux | `~/.local/share/fpl-helper` |
+
+`--state-dir <path>` overrides it, as does the `FPL_STATE_DIR` environment
+variable. `--port`, `--host` and `--no-browser` are also available
+(`fpl-helper --help`). It binds `127.0.0.1` — this machine only — because
+there is no authentication; `run.py` is the entry point that serves a network.
+
+The first fetch takes 10-15 minutes, almost all of it walking the FPL API at
+one request per second. Later refreshes take seconds.
+
+### Your own key, your own data
+
+The setup page asks for **your own** free Gemini key from
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey), stored in
+`secrets/gemini_key.txt` inside your state directory and never in
+`config.yaml`. Keys are per-person and come with their own quota. Leave the
+field blank and everything except the crowd-intel layer works — the
+projections are pure maths and never touch it.
+
+Nothing about whoever built the binary is inside it. The release workflow
+builds from a clean checkout and `tools/check_bundle.py` fails the build if
+`config.yaml`, `secrets/`, `data/` or `context.md` are present in the tree, or
+if anything resembling a real key or config turns up in the finished file.
+
+---
+
 ## Install on Linux
 
-Python **3.11 or newer** and `git` are the only requirements. SQLite needs no
+Python **3.11 or newer** is the only hard requirement, plus `git` if you want
+to clone this repository rather than download a zip of it. SQLite needs no
 installation, as it is part of Python's standard library, and the database is
-created on first run at `data/fpl.db`.
+created on first run at `data/fpl.db`. The historical dataset is fetched over
+plain HTTPS, so it needs no git of its own.
 
 ```bash
 # Debian / Ubuntu / Raspberry Pi OS
@@ -244,11 +319,21 @@ $EDITOR config.yaml
 ```
 
 `config.yaml` is **gitignored**. It is where everything personal lives, and it
-never leaves your machine. `config.example.yaml` is the committed template, and
-the app falls back to it if `config.yaml` is missing, so a fresh clone still
-boots (with no teams).
+never leaves your machine. `config.example.yaml` is the committed template.
 
 Only `team_ids` has to be filled in. Everything else has a working default.
+
+**Or let the app write it.** Start the app without a `config.yaml` and every
+page redirects to a setup form that asks for your team id, writes the file and
+runs the first refresh. That is how the [downloadable
+build](#download-and-run-it-no-python-needed) is meant to be set up, and it
+works the same from a source checkout — useful if you would rather not hand-edit
+YAML. The generated file sets `refresh_hour: 6` so the app refreshes itself;
+delete that line if cron is going to own the schedule instead.
+
+The app still falls back to reading `config.example.yaml` so a fresh clone
+boots, but it treats that as unconfigured — those placeholder team ids are not
+anybody's team — and sends you to setup rather than rendering empty pages.
 
 ### Where to put your team IDs
 
@@ -420,9 +505,10 @@ source .venv/bin/activate    # Option A/C only; skip it on Option B
 python -m app.refresh        # Option B: python3 -m app.refresh
 ```
 
-This takes a few minutes the first time: it sparse-clones the historical
-dataset and walks the FPL API at roughly one request per second. Later runs are
-much quicker, about 8 seconds when there is nothing new.
+This takes a few minutes the first time: it downloads the historical dataset
+(about 11 MB of CSV, a few seconds) and walks the FPL API at roughly one
+request per second, which is the slow part. Later runs are much quicker, about
+8 seconds when there is nothing new.
 
 ```bash
 python run.py                # Option B: python3 run.py
@@ -562,7 +648,7 @@ From the CLI, which is also what cron calls:
 
 ```bash
 python -m app.refresh                    # normal run
-python -m app.refresh --force-historical # re-pull the historical dataset
+python -m app.refresh --force-historical # re-fetch the historical dataset
 python -m app.refresh --quiet            # warnings and errors only
 ```
 
@@ -984,6 +1070,40 @@ python -m pytest tests/ -q
 
 Nothing in the app requires it to run.
 
+### Building the downloadable binaries
+
+`.github/workflows/release.yml` builds all four on a tag (`v*`) or on demand,
+attaching them to a draft release. Each job checks out cleanly, builds with
+PyInstaller against `fpl-helper.spec`, and then starts the finished binary and
+asserts it serves `/setup` — a missing hidden import does not fail a
+PyInstaller build, it fails the first double-click, so the smoke test is the
+part that catches it.
+
+**The bundle list is an allowlist.** `fpl-helper.spec` names every file that
+ships and never globs a directory, because the project directory of anyone who
+has actually run this app contains `config.yaml`, `secrets/gemini_key.txt` and
+`data/`. `tools/check_bundle.py` enforces that independently:
+
+```bash
+python tools/check_bundle.py --source .              # before: tree must be clean
+python tools/check_bundle.py --binary dist/fpl-helper # after: artefact must be clean
+```
+
+The `--source` check **fails on a normal working tree**, and that is the point
+— it is what stops a local `pyinstaller` run from shipping your own data. Build
+from a fresh clone:
+
+```bash
+git clone https://github.com/boredtoolbox/fpl-helper /tmp/build && cd /tmp/build
+python -m venv .venv && .venv/bin/pip install -r requirements.txt pyinstaller
+.venv/bin/python tools/check_bundle.py --source .
+.venv/bin/pyinstaller --clean --noconfirm fpl-helper.spec
+.venv/bin/python tools/check_bundle.py --binary dist/fpl-helper
+```
+
+CI pins Python 3.13 rather than 3.14, only because a PyInstaller hook lagging a
+new release should not be able to break a build.
+
 ```
 app/
   __init__.py       app factory + scheduler
@@ -993,6 +1113,7 @@ app/
   retention.py      what we keep: replace crowd intel, prune the fetch log
   crowd_refresh.py  crowd-intel CLI (the cron entry point)
   routes.py         Flask routes
+  setup.py          first-run setup page: writes config.yaml, runs refresh 1
   views.py          read-only queries backing the pages
   logging_setup.py  rotating file logs
   services/
@@ -1004,8 +1125,11 @@ app/
     kits.py         team imagery: shirts and crests, cached under static/
 templates/          Jinja2, one per page plus shared macros
 static/             one stylesheet, one small JS file
-tools/              find_channel_id.py
+tools/              find_channel_id.py, check_bundle.py
 tests/
+run.py              server entry point: all interfaces, cron owns the schedule
+desktop.py          packaged entry point: localhost, opens a browser, self-schedules
+fpl-helper.spec     PyInstaller allowlist
 ```
 
 Logs rotate in `logs/` (5 × 2MB). SQLite lives at `data/fpl.db`.
@@ -1016,10 +1140,13 @@ Logs rotate in `logs/` (5 × 2MB). SQLite lives at `data/fpl.db`.
   the endpoints used here. The client sends a real User-Agent, retries with
   backoff, and stays under one request per second.
 - [vaastav/Fantasy-Premier-League](https://github.com/vaastav/Fantasy-Premier-League):
-  per-gameweek history for past seasons. Sparse-cloned on first run (only the
-  seasons in `historical_seasons`), then `git pull`ed weekly. Players are matched
-  across seasons by the FPL `code`, which is stable, so no name matching is
-  needed for historical data.
+  per-gameweek history for past seasons. Only four files are ever read —
+  `master_team_list.csv` plus `players_raw.csv`, `teams.csv` and
+  `gws/merged_gw.csv` for each season in `historical_seasons` — so they are
+  downloaded individually over HTTPS and cached under `historical_data_dir`,
+  refreshed weekly. ETags mean an unchanged file costs a 304 and no transfer.
+  Players are matched across seasons by the FPL `code`, which is stable, so no
+  name matching is needed for historical data.
 
 ---
 
@@ -1044,9 +1171,16 @@ channel ID), or YouTube has temporarily blocked your IP. The log distinguishes
 the two; a block reads "YouTube blocked transcript requests from this IP" and
 normally clears within the hour. Nothing else in the refresh is affected.
 
-**`git pull` fails on the historical dataset.** The app keeps using the existing
-checkout and logs a warning. Force a fresh pull with
-`python -m app.refresh --force-historical`.
+**A historical dataset download fails.** The app keeps using the CSVs already
+on disk and logs a warning — stale history beats no history. Force a fresh
+fetch with `python -m app.refresh --force-historical`.
+
+**Upgrading from a version that cloned the dataset.** Nothing to do: the
+downloads land on the same paths the clone used, so the app carries on reading
+them. The old checkout under `historical_data_dir` is dead weight after that —
+deleting the whole directory is safe and reclaims about 115 MB, and the next
+refresh re-fetches the ~11 MB it actually needs. The app logs a reminder while
+the old `.git` directory is still there.
 
 ## Licence
 

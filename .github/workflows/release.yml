@@ -1,0 +1,139 @@
+name: Build downloadable binaries
+
+# Tag a release to publish, or run it by hand to get artefacts without one.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04     # oldest supported glibc, so it runs on older distros too
+            label: linux-x86_64
+            artifact: fpl-helper-linux-x86_64
+          - os: macos-13         # Intel
+            label: macos-x86_64
+            artifact: fpl-helper-macos-x86_64
+          - os: macos-14         # Apple Silicon
+            label: macos-arm64
+            artifact: fpl-helper-macos-arm64
+          - os: windows-latest
+            label: windows-x86_64
+            artifact: fpl-helper-windows-x86_64.exe
+
+    steps:
+      # A fresh clone is the primary safeguard: config.yaml, secrets/ and
+      # data/ are gitignored, so they are simply not present here and cannot
+      # be swept into the bundle. The check below proves it rather than
+      # assuming it.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Pinned one behind the maintainer's local 3.14 so a lagging
+          # PyInstaller hook cannot break a release build.
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller==6.22.3
+
+      - name: Refuse to build from a tree containing private files
+        run: python tools/check_bundle.py --source .
+
+      - name: Build
+        run: pyinstaller --clean --noconfirm fpl-helper.spec
+
+      - name: Name the artefact
+        shell: bash
+        run: |
+          mkdir -p out
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp dist/fpl-helper.exe "out/${{ matrix.artifact }}"
+          else
+            cp dist/fpl-helper "out/${{ matrix.artifact }}"
+            chmod +x "out/${{ matrix.artifact }}"
+          fi
+
+      - name: Scan the finished binary for private data
+        run: python tools/check_bundle.py --binary "out/${{ matrix.artifact }}"
+
+      # Missing hidden imports do not fail the build — they fail the first time
+      # a user double-clicks. Start the real binary and make sure it serves the
+      # setup page before shipping it.
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -e
+          STATE="$(mktemp -d)/state"
+          "./out/${{ matrix.artifact }}" --no-browser --port 8123 --state-dir "$STATE" &
+          APP_PID=$!
+          for i in $(seq 1 45); do
+            if curl -sf -o /dev/null "http://127.0.0.1:8123/setup"; then
+              echo "serving after ${i}s"
+              break
+            fi
+            if ! kill -0 "$APP_PID" 2>/dev/null; then
+              echo "the binary exited on startup"
+              exit 1
+            fi
+            sleep 1
+          done
+          code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8123/setup")
+          echo "GET /setup -> $code"
+          [ "$code" = "200" ] || { echo "setup page did not serve"; exit 1; }
+          # An unconfigured install must redirect the front page into setup.
+          redir=$(curl -s -o /dev/null -w '%{redirect_url}' "http://127.0.0.1:8123/")
+          echo "GET / -> $redir"
+          case "$redir" in *"/setup") ;; *) echo "guard did not redirect"; exit 1 ;; esac
+          kill "$APP_PID" 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: out/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  release:
+    name: Attach to the release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          draft: true
+          body: |
+            Download the file for your machine, then see
+            [Download and run it](https://github.com/boredtoolbox/fpl-helper#download-and-run-it-no-python-needed).
+
+            **These binaries are unsigned**, so your operating system will
+            warn you before it runs one:
+
+            * **macOS** — right-click the file, choose *Open*, then *Open*
+              again. Double-clicking gives you no way past the warning.
+              You may also need `chmod +x` and
+              `xattr -d com.apple.quarantine <file>`.
+            * **Windows** — SmartScreen says "Windows protected your PC".
+              Choose *More info*, then *Run anyway*.
+
+            Signing them properly costs $99/year (Apple) and a few hundred
+            more (Windows), which this project does not spend.

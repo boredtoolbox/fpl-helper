@@ -6,11 +6,11 @@ import logging.handlers
 import os
 from pathlib import Path
 
-from .config import PROJECT_ROOT
+from .config import STATE_ROOT
 
 # Overridable so tests (and anyone packaging this elsewhere) don't write into
 # the project's own logs/ directory.
-LOG_DIR = Path(os.environ.get("FPL_LOG_DIR") or (PROJECT_ROOT / "logs"))
+LOG_DIR = Path(os.environ.get("FPL_LOG_DIR") or (STATE_ROOT / "logs"))
 LOG_FILE = LOG_DIR / "fpl-helper.log"
 FORMAT = "%(asctime)s %(levelname)-7s %(name)-28s %(message)s"
 

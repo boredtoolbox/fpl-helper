@@ -26,7 +26,11 @@ gemini_model: "gemini-3.5-flash-lite"
 refresh_hour: null
 
 db_path: ./data/fpl.db
-historical_repo_dir: ./data/Fantasy-Premier-League
+
+# Where the vaastav historical CSVs are cached. The app downloads the four
+# files it reads straight over HTTPS, so git is not needed for this.
+# (The old name `historical_repo_dir` still works.)
+historical_data_dir: ./data/Fantasy-Premier-League
 
 # How many upcoming gameweeks the decision engine projects over.
 horizon_gws: 6

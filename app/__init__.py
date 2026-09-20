@@ -10,9 +10,9 @@ import logging
 import os
 from datetime import datetime, timezone
 
-from flask import Flask
+from flask import Flask, send_from_directory
 
-from .config import Config, PROJECT_ROOT, load_config
+from .config import BUNDLE_ROOT, Config, IMAGE_ROOT, STATE_ROOT, load_config
 from .db import init_db
 from .logging_setup import setup_logging
 
@@ -87,8 +87,8 @@ def create_app(config_path: str | None = None, *, start_scheduler: bool = True) 
 
     app = Flask(
         __name__,
-        template_folder=str(PROJECT_ROOT / "templates"),
-        static_folder=str(PROJECT_ROOT / "static"),
+        template_folder=str(BUNDLE_ROOT / "templates"),
+        static_folder=str(BUNDLE_ROOT / "static"),
     )
     app.config["FPL_CONFIG"] = cfg
     # Session only stores which of my own teams is selected — no secrets in it.
@@ -97,9 +97,24 @@ def create_app(config_path: str | None = None, *, start_scheduler: bool = True) 
 
     init_db(cfg.db_path)
 
+    # Kits and crests are downloaded by the refresh job, so they sit under the
+    # writable state directory rather than in the bundled static folder. This
+    # rule is more specific than Flask's own /static/<path:filename>, so it
+    # wins for these two prefixes and the templates' url_for('static', ...)
+    # calls need no changing. In a source checkout both point at the same
+    # directory, which is why this path is exercised in normal development too.
+    @app.route("/static/<any(kits, crests):kind>/<path:filename>")
+    def runtime_image(kind: str, filename: str):
+        return send_from_directory(IMAGE_ROOT / kind, filename, max_age=86400)
+
     from .routes import bp
 
     app.register_blueprint(bp)
+
+    # Mounted last so its before_request guard sees every other endpoint.
+    from .setup import register as register_setup
+
+    register_setup(app)
 
     @app.template_filter("fmt_rank")
     def fmt_rank(value):
@@ -195,7 +210,7 @@ def create_app(config_path: str | None = None, *, start_scheduler: bool = True) 
 
 def _local_secret() -> str:
     """Stable per-install secret so sessions survive restarts."""
-    path = PROJECT_ROOT / "data" / ".flask_secret"
+    path = STATE_ROOT / "data" / ".flask_secret"
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         return path.read_text(encoding="utf-8").strip()

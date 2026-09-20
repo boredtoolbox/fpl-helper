@@ -1,8 +1,14 @@
 """vaastav/Fantasy-Premier-League historical dataset.
 
-Clones (sparsely, blobless — the full repo is large) or pulls the dataset, loads
+Downloads the handful of CSVs the loaders below actually open, loads
 `merged_gw.csv` for the configured seasons into `historical_player_gw`, and
 aggregates a per-(player, opponent) head-to-head table.
+
+Four files per season are needed, so they are fetched over plain HTTPS rather
+than by cloning the repository. git is one more thing to install — and one more
+thing to be missing on a machine that just downloaded a binary — while even a
+blobless sparse clone drags in the whole working tree (roughly 115 MB) to read
+about 12 MB of CSV. ETags mean an unchanged file costs a 304 and nothing else.
 
 Player identity across seasons uses the FPL `code` (a stable per-person id that
 survives transfers and season rollovers), read from each season's
@@ -12,19 +18,28 @@ season's team id to a team name; names are then matched to current team ids.
 from __future__ import annotations
 
 import csv
+import json
 import logging
-import shutil
+import os
 import sqlite3
-import subprocess
+import time
 from pathlib import Path
 from typing import Any, Iterable
+
+import requests
 
 from ..db import log_fetch, set_meta, upsert_many, utcnow
 
 log = logging.getLogger(__name__)
 
 REPO_URL = "https://github.com/vaastav/Fantasy-Premier-League"
-GIT_TIMEOUT = 900
+RAW_BASE = "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master"
+USER_AGENT = "fpl-helper/1.0 (personal FPL analysis tool)"
+DOWNLOAD_TIMEOUT = 120
+DOWNLOAD_RETRIES = 3
+# Path -> the ETag it last arrived with, so a refresh re-downloads only what
+# actually changed. Lives inside the dataset directory, next to what it describes.
+ETAG_FILE = ".etags.json"
 
 # Team names that differ between the historical dataset and the current
 # bootstrap. Applied to both sides — the loader normalises the dataset as it
@@ -51,6 +66,9 @@ TEAM_NAME_ALIASES = {
     "Luton Town": "Luton",
 }
 
+# Not season-specific, so it is fetched once per refresh rather than per season.
+SHARED_FILES = ("data/master_team_list.csv",)
+
 
 def normalise_team_name(name: str | None) -> str:
     if not name:
@@ -59,63 +77,155 @@ def normalise_team_name(name: str | None) -> str:
     return TEAM_NAME_ALIASES.get(name, name)
 
 
-def _run_git(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git", *args],
-        cwd=str(cwd) if cwd else None,
-        capture_output=True,
-        text=True,
-        timeout=GIT_TIMEOUT,
-        check=False,
+def season_files(season: str) -> tuple[str, ...]:
+    """The only paths this module opens for a season, relative to the data dir."""
+    return (
+        f"data/{season}/players_raw.csv",
+        f"data/{season}/teams.csv",
+        f"data/{season}/gws/merged_gw.csv",
     )
 
 
-def git_available() -> bool:
-    return shutil.which("git") is not None
+def merged_gw_path(data_dir: Path, season: str) -> Path:
+    """The file that carries the actual gameweek rows for a season."""
+    return Path(data_dir) / "data" / season / "gws" / "merged_gw.csv"
 
 
-def ensure_repo(repo_dir: Path, seasons: Iterable[str]) -> bool:
-    """Clone on first run, `git pull` afterwards. Returns True if usable."""
-    repo_dir = Path(repo_dir)
-    seasons = list(seasons)
-    if not git_available():
-        log.error("git not on PATH — cannot fetch the historical dataset.")
-        return False
+def _load_etags(data_dir: Path) -> dict[str, str]:
+    try:
+        raw = json.loads((data_dir / ETAG_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
 
-    # Cone mode takes directories only; files sitting directly in a parent dir
-    # (data/master_team_list.csv) come along automatically.
-    sparse_paths = [f"data/{s}" for s in seasons]
 
-    if not (repo_dir / ".git").exists():
-        repo_dir.parent.mkdir(parents=True, exist_ok=True)
-        if repo_dir.exists() and any(repo_dir.iterdir()):
-            log.warning("%s exists but is not a git repo; leaving it alone.", repo_dir)
-            return (repo_dir / "data").exists()
-        log.info("Cloning historical dataset into %s (first run, may take a minute)…", repo_dir)
-        res = _run_git(
-            [
-                "clone", "--depth", "1", "--filter=blob:none", "--sparse",
-                REPO_URL, str(repo_dir),
-            ]
-        )
-        if res.returncode != 0:
-            log.error("clone failed: %s", res.stderr.strip()[:500])
-            return False
-        res = _run_git(["sparse-checkout", "set", *sparse_paths], cwd=repo_dir)
-        if res.returncode != 0:
-            log.error("sparse-checkout failed: %s", res.stderr.strip()[:500])
-            return False
-        log.info("Historical dataset cloned.")
+def _save_etags(data_dir: Path, etags: dict[str, str]) -> None:
+    try:
+        (data_dir / ETAG_FILE).write_text(json.dumps(etags, indent=2, sort_keys=True), encoding="utf-8")
+    except OSError as exc:
+        # Losing the cache costs a re-download next time, nothing more.
+        log.warning("could not write %s: %s", data_dir / ETAG_FILE, exc)
+
+
+def _write_atomic(resp: requests.Response, dest: Path) -> None:
+    """Stream to a sibling temp file, then rename over the target.
+
+    A half-written CSV is worse than a stale one, because it still parses: the
+    loader would silently drop every row after the truncation instead of
+    failing and leaving the previous data in place.
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name(dest.name + ".part")
+    try:
+        with tmp.open("wb") as fh:
+            for chunk in resp.iter_content(chunk_size=1 << 16):
+                fh.write(chunk)
+        os.replace(tmp, dest)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _download(
+    session: requests.Session, rel_path: str, dest: Path, etags: dict[str, str]
+) -> bool:
+    """Fetch one CSV to `dest`. True if `dest` is usable afterwards."""
+    url = f"{RAW_BASE}/{rel_path}"
+    headers: dict[str, str] = {}
+    # An ETag only means anything while the file it describes is still there;
+    # sending one for a file we have since deleted would earn a 304 and no data.
+    if dest.exists() and rel_path in etags:
+        headers["If-None-Match"] = etags[rel_path]
+
+    for attempt in range(DOWNLOAD_RETRIES):
+        try:
+            resp = session.get(url, headers=headers, timeout=DOWNLOAD_TIMEOUT, stream=True)
+        except requests.RequestException as exc:
+            log.warning("GET %s failed (attempt %d): %s", rel_path, attempt + 1, exc)
+        else:
+            with resp:
+                if resp.status_code == 304:
+                    log.debug("%s unchanged", rel_path)
+                    return True
+                if resp.status_code == 404:
+                    # A season the dataset has not published yet, most likely.
+                    log.warning("%s is not in the dataset (404).", rel_path)
+                    return dest.exists()
+                if resp.status_code == 200:
+                    try:
+                        _write_atomic(resp, dest)
+                    except (OSError, requests.RequestException) as exc:
+                        log.error("could not write %s: %s", dest, exc)
+                        return dest.exists()
+                    etag = resp.headers.get("ETag")
+                    if etag:
+                        etags[rel_path] = etag
+                    else:
+                        etags.pop(rel_path, None)
+                    log.info("fetched %s", rel_path)
+                    return True
+                log.warning(
+                    "GET %s returned HTTP %d (attempt %d)", rel_path, resp.status_code, attempt + 1
+                )
+        if attempt < DOWNLOAD_RETRIES - 1:
+            time.sleep(2 ** attempt)
+
+    # Falling back to the copy on disk is the bargain the old `git pull` failure
+    # made too: stale history beats no history.
+    if dest.exists():
+        log.warning("could not refresh %s; keeping the copy already on disk.", rel_path)
         return True
+    log.error("could not download %s, and there is no local copy.", rel_path)
+    return False
 
-    # Existing clone: make sure the seasons we want are checked out, then pull.
-    _run_git(["sparse-checkout", "set", *sparse_paths], cwd=repo_dir)
-    res = _run_git(["pull", "--ff-only", "--depth", "1"], cwd=repo_dir)
-    if res.returncode != 0:
-        log.warning("git pull failed (using existing checkout): %s", res.stderr.strip()[:300])
-    else:
-        log.info("Historical dataset updated: %s", res.stdout.strip()[:200] or "up to date")
-    return True
+
+def _note_legacy_clone(data_dir: Path) -> None:
+    """Older installs cloned the repo here. Nothing reads the checkout now."""
+    if not (data_dir / ".git").exists():
+        return
+    log.warning(
+        "%s is an old git checkout of the dataset, which nothing reads any more "
+        "— the CSVs are downloaded directly now. Deleting the whole directory is "
+        "safe and reclaims about 115 MB; the next refresh re-fetches the ~11 MB "
+        "it actually needs.",
+        data_dir,
+    )
+
+
+def ensure_dataset(data_dir: Path, seasons: Iterable[str]) -> bool:
+    """Download the CSVs the loaders read. True if any season is loadable."""
+    data_dir = Path(data_dir)
+    seasons = list(seasons)
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        log.error("cannot create %s: %s", data_dir, exc)
+        return False
+    _note_legacy_clone(data_dir)
+
+    etags = _load_etags(data_dir)
+    session = requests.Session()
+    session.headers.update({"User-Agent": USER_AGENT, "Accept": "text/plain, */*"})
+
+    usable: list[str] = []
+    try:
+        for rel in SHARED_FILES:
+            _download(session, rel, data_dir / rel, etags)
+        for season in seasons:
+            for rel in season_files(season):
+                _download(session, rel, data_dir / rel, etags)
+            # merged_gw.csv carries the rows; the other two only decorate them,
+            # and load_team_map already falls back to the master list when a
+            # season's own teams.csv is missing. So that one file decides
+            # whether the season is worth loading at all.
+            if merged_gw_path(data_dir, season).exists():
+                usable.append(season)
+            else:
+                log.warning("season %s has no gameweek data available; skipping it.", season)
+    finally:
+        session.close()
+        _save_etags(data_dir, etags)
+
+    return bool(usable)
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -135,9 +245,9 @@ def _num(value: Any, cast=int, default=0):
         return default
 
 
-def load_id_maps(repo_dir: Path, season: str) -> tuple[dict[int, int], dict[int, str]]:
+def load_id_maps(data_dir: Path, season: str) -> tuple[dict[int, int], dict[int, str]]:
     """Return (season element id -> stable player code, element id -> position)."""
-    rows = _read_csv(Path(repo_dir) / "data" / season / "players_raw.csv")
+    rows = _read_csv(Path(data_dir) / "data" / season / "players_raw.csv")
     code_by_id: dict[int, int] = {}
     pos_by_id: dict[int, str] = {}
     types = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -150,20 +260,20 @@ def load_id_maps(repo_dir: Path, season: str) -> tuple[dict[int, int], dict[int,
     return code_by_id, pos_by_id
 
 
-def load_team_map(repo_dir: Path, season: str) -> dict[int, str]:
+def load_team_map(data_dir: Path, season: str) -> dict[int, str]:
     """season team id -> normalised team name.
 
     Prefers the season's own teams.csv; master_team_list.csv is the fallback but
     it lags behind by a couple of seasons, so it can't be the primary source.
     """
     out: dict[int, str] = {}
-    for r in _read_csv(Path(repo_dir) / "data" / season / "teams.csv"):
+    for r in _read_csv(Path(data_dir) / "data" / season / "teams.csv"):
         tid = _num(r.get("id"), int, -1)
         if tid >= 0:
             out[tid] = normalise_team_name(r.get("name"))
     if out:
         return out
-    for r in _read_csv(Path(repo_dir) / "data" / "master_team_list.csv"):
+    for r in _read_csv(Path(data_dir) / "data" / "master_team_list.csv"):
         if (r.get("season") or "").strip() == season:
             out[_num(r.get("team"), int, -1)] = normalise_team_name(r.get("team_name"))
     if not out:
@@ -181,16 +291,16 @@ HIST_FLOAT_COLS = (
 ).split()
 
 
-def load_season(conn: sqlite3.Connection, repo_dir: Path, season: str) -> int:
+def load_season(conn: sqlite3.Connection, data_dir: Path, season: str) -> int:
     """Load one season's merged_gw.csv into historical_player_gw."""
-    path = Path(repo_dir) / "data" / season / "gws" / "merged_gw.csv"
+    path = merged_gw_path(data_dir, season)
     rows = _read_csv(path)
     if not rows:
         log_fetch(conn, "historical", season, False, f"no rows at {path}")
         return 0
 
-    code_by_id, pos_by_id = load_id_maps(repo_dir, season)
-    team_map = load_team_map(repo_dir, season)
+    code_by_id, pos_by_id = load_id_maps(data_dir, season)
+    team_map = load_team_map(data_dir, season)
 
     out: list[dict[str, Any]] = []
     for r in rows:
@@ -271,17 +381,17 @@ def build_head_to_head(conn: sqlite3.Connection, seasons: Iterable[str]) -> int:
 
 
 def sync_historical(
-    conn: sqlite3.Connection, repo_dir: Path, seasons: Iterable[str], *, pull: bool = True
+    conn: sqlite3.Connection, data_dir: Path, seasons: Iterable[str], *, download: bool = True
 ) -> dict:
-    """Full historical refresh: ensure repo, load seasons, rebuild head-to-head."""
+    """Full historical refresh: fetch the CSVs, load seasons, rebuild head-to-head."""
     seasons = list(seasons)
     result: dict[str, Any] = {"seasons": {}, "head_to_head": 0}
-    if pull and not ensure_repo(Path(repo_dir), seasons):
-        log.warning("historical repo unavailable; keeping whatever is already in the DB.")
-        result["error"] = "repo unavailable"
+    if download and not ensure_dataset(Path(data_dir), seasons):
+        log.warning("historical dataset unavailable; keeping whatever is already in the DB.")
+        result["error"] = "dataset unavailable"
         return result
     for season in seasons:
-        result["seasons"][season] = load_season(conn, Path(repo_dir), season)
+        result["seasons"][season] = load_season(conn, Path(data_dir), season)
     result["head_to_head"] = build_head_to_head(conn, seasons)
     set_meta(conn, "historical_synced_at", utcnow())
     return result
