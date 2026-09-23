@@ -8,14 +8,12 @@
    cell in the column so a value 400 rows down can still say what it is. #}
 {% set help = {
   'cmp':    'Tick to compare. The first tick splits the page in two, and the panel takes either reading: Below lines the ticked players up as rows under the table, in its own columns and sharing its sideways scroll; Beside stands them on their side next to it, a column each and a row per stat.\nA number is marked when it is the best of the ticked players — only where they actually differ, and only for stats where more is better, so £m and Own % are never crowned.\nTicks survive sorting and filtering: narrow the table right down to find the next player without losing the ones already in the panel.',
-  'player': 'The player\'s FPL short name; hover for the full name.\nThe caret opens this season game by game — goals, assists, DefCon, saves and points per match — then their club\'s and their own record against each of the next six opponents.',
+  'player': 'The player\'s FPL short name; hover for the full name.\nClick it to open a panel from the right with this season game by game — goals, assists, DefCon, saves and points per match — then their club\'s and their own record against each of the next six opponents.',
   'pos':    'Position: GKP, DEF, MID or FWD.\nEvery coloured band on this row is cut against other players in this position, not against the whole game.',
   'team':   'Club, by three-letter code.',
   'next6':  'The next six fixtures, earliest first.\nColour is FPL\'s own difficulty rating, 1 (easy) to 5 (hard). 🏠 home, ✈️ away.\nFewer than six cells means fewer fixtures — a blank gameweek.',
   'price':  'Current selling price: FPL\'s cost ÷ 10.\nDeliberately not colour-banded — cheap is only good for what it frees up.',
-  'ep':     'FPL\'s OWN expected points for the next gameweek, taken straight from their API.\nA second opinion, calculated by them, not by this app. Compare it with xPts.',
-  'xpts':   'This app\'s projected points for the next gameweek — the sum of eight parts:\n• Appearance: 2 × P(60 mins) + 1 × P(played but under 60)\n• Goals: xG/90 × minutes share × opponent adjustment × finishing, × 6/6/5/4 pts by position\n• Assists: xA/90 on the same basis, × 3 pts\n• Clean sheet: e^(−expected goals conceded) × P(60 mins) × 4/4/1/0 pts\n• DefCon: hit rate × 2 pts × P(60 mins)\n• Saves: saves/90 ÷ 3 (keepers)\n• Bonus: bonus per 90 × minutes share\n• Minus cards and, for GKP/DEF, expected −1 per 2 goals conceded\nOpponent adjustment is a Poisson model of both teams\' expected goals, from attack and defence ratings blended between this season and last, ×1.10 at home and ×0.92 away.',
-  'xpts6':  'The xPts above, summed across all six projected gameweeks.\nNot discounted: a point in the sixth gameweek counts the same as one in the next.\nA player with a blank gameweek simply has fewer fixtures in the total.',
+  'ep':     'FPL\'s OWN expected points for the next gameweek, taken straight from their API.\nA second opinion: their calculation, not this app\'s.',
   'pts':    'Total FPL points scored so far this season, as reported by FPL.',
   'form':   'FPL\'s own form figure: average points per match over the last 30 days.',
   'own':    'Percentage of FPL managers who own this player.\nDeliberately not colour-banded — a crowded pick is a risk or a safety net depending on what you are trying to do.',
@@ -44,9 +42,9 @@
 <div class="notice">
   <span class="band-key"><span class="chip b-good">good</span><span class="chip b-avg">average</span><span class="chip b-bad">below average</span><span class="chip b-thin">too soon to say</span></span>
   Each number is graded against others <strong>in the same position</strong>.
-  Open the <span class="caret-key">▾</span> next to a name for what the rates are made
-  of: this season match by match, then how the player's club has done against each of
-  the next six opponents and what the player did in those games.
+  Click a player's name for what the rates are made of: a panel opens from the
+  right with this season match by match, then how the player's club has done
+  against each of the next six opponents and what the player did in those games.
   Tick <span class="caret-key">vs</span> on two or three rows to stand them side by
   side — as rows under the table, or as columns beside it.
 </div>
@@ -102,14 +100,12 @@
         <thead>
           <tr>
             <th class="cmp-cell" data-nosort data-compare-skip title="{{ help.cmp }}">vs</th>
-            <th data-type="text" data-compare-skip title="{{ help.player }}">Player</th>
+            <th data-type="text" data-compare-skip data-notip title="{{ help.player }}">Player</th>
             <th data-type="text" data-compare-skip title="{{ help.pos }}">Pos</th>
             <th data-type="text" data-compare-skip title="{{ help.team }}">Team</th>
             <th data-nosort title="{{ help.next6 }}">Next 6</th>
             <th class="num" title="{{ help.price }}">£m</th>
             <th class="num" data-best="high" title="{{ help.ep }}">EP</th>
-            <th class="num" data-best="high" title="{{ help.xpts }}">xPts</th>
-            <th class="num" data-best="high" title="{{ help.xpts6 }}">xPts 6</th>
             <th class="num" data-best="high" title="{{ help.pts }}">Pts</th>
             <th class="num" data-best="high" title="{{ help.form }}">Form</th>
             <th class="num" title="{{ help.own }}">Own %</th>
@@ -133,19 +129,17 @@
               <input type="checkbox" class="cmp-box" data-compare
                      aria-label="Compare {{ p.full_name }}" title="Compare {{ p.name }}">
             </td>
-            {# The caret is inside the cell so the column count is unchanged; the
-               sort key is set explicitly so its glyph never reaches the sorter. #}
+            {# The sort key is set on the cell rather than read from it, so the
+               button's markup can change without touching the sorter. #}
             <td class="name" title="{{ p.full_name }}" data-sort="{{ p.name }}">
-              <button type="button" class="caret" data-expand aria-expanded="false"
-                      title="This season match by match, and the record against the next six opponents">▾</button>{{ p.name }}{% if p.owned %} <span class="badge accent" title="In the selected squad">owned</span>{% endif %}
+              <button type="button" class="name-open" data-open-player aria-haspopup="dialog"
+                      title="{{ p.full_name }}">{{ p.name }}</button>{% if p.owned %} <span class="badge accent" title="In the selected squad">owned</span>{% endif %}
             </td>
             <td><span class="pos">{{ p.position }}</span></td>
             <td><span class="team-tag">{{ p.team }}</span></td>
             <td>{{ ticker(p.fixtures) }}</td>
             <td class="num">{{ '%.1f' % p.price }}</td>
             <td class="num {{ p.bands.ep_next }}">{{ p.ep_next }}</td>
-            <td class="num {{ p.bands.xpts_next }}"><strong>{{ '%.2f' % p.xpts_next }}</strong></td>
-            <td class="num {{ p.bands.xpts_horizon }}">{{ '%.1f' % p.xpts_horizon }}</td>
             <td class="num {{ p.bands.total_points }}">{{ p.total_points }}</td>
             <td class="num {{ p.bands.form }}">{{ p.form }}</td>
             <td class="num">{{ p.ownership }}</td>
@@ -197,4 +191,28 @@
     </div>
   </aside>
 </div>
+{# The player panel.
+
+   One element for the whole table rather than a row each: a panel that slides
+   in from the right is a place on the page, not a property of a row, and
+   seven hundred empty copies of it would be seven hundred copies of nothing.
+   It is filled on demand from the same endpoint the sub-table used.
+
+   Deliberately not modal. The table behind it stays live, so you can sort,
+   filter and click straight on to the next player and watch the panel change
+   under you — which is the point of moving out of the table in the first
+   place. The scrim only appears where the panel has to cover the page. #}
+<div class="drawer-scrim" data-drawer-scrim hidden></div>
+<aside class="drawer" data-player-drawer hidden role="dialog"
+       aria-labelledby="drawer-title" tabindex="-1">
+  <header class="drawer-head">
+    <div class="drawer-heading">
+      <div class="eyebrow" data-drawer-sub></div>
+      <h3 id="drawer-title" data-drawer-title></h3>
+    </div>
+    <button type="button" class="drawer-close" data-drawer-close
+            title="Close (Esc)" aria-label="Close">&times;</button>
+  </header>
+  <div class="drawer-body" data-drawer-body></div>
+</aside>
 {% endblock %}

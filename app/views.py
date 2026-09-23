@@ -39,7 +39,7 @@ BAND_MINUTES_FLOOR = 60
 BAND_RATE_STATS = ("xg90", "xa90", "goals90", "assists90", "mins_per_start", "defcon90")
 # Season levels are graded for everyone against those cuts, so a player who has
 # not featured shows red — which is the honest reading of no returns.
-BAND_LEVEL_STATS = ("ep_next", "total_points", "form", "ppg", "xpts_next", "xpts_horizon")
+BAND_LEVEL_STATS = ("ep_next", "total_points", "form", "ppg")
 # Stats that carry their own sample gate rather than a minutes one, as
 # {stat: (count field, minimum)}. DefCon reliability off two matches is noise,
 # and colouring noise is worse than leaving it plain.
@@ -499,21 +499,17 @@ def entry_stats(conn: sqlite3.Connection, team_id: int) -> dict[str, Any]:
 
 def player_table(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     """Every player with underlying stats + projections, for the explorer."""
-    horizon: dict[int, float] = {}
-    next_xpts: dict[int, float] = {}
     next_opp: dict[int, list[dict[str, Any]]] = {}
-    row = conn.execute("SELECT MIN(event) AS e FROM projections").fetchone()
-    first_event = row["e"] if row and row["e"] else None
 
+    # `projections` is read for the fixture run only — the opponent, where it is
+    # played and how hard it is. The xPts columns this table used to carry were
+    # dropped, so the projected points themselves are not selected.
     for r in conn.execute(
-        "SELECT pr.player_id, pr.event, pr.xpts, pr.was_home, pr.difficulty, "
+        "SELECT pr.player_id, pr.event, pr.was_home, pr.difficulty, "
         "t.short_name AS opp FROM projections pr "
         "LEFT JOIN teams t ON t.id = pr.opponent_team ORDER BY pr.event"
     ):
         pid = r["player_id"]
-        horizon[pid] = horizon.get(pid, 0.0) + (r["xpts"] or 0.0)
-        if r["event"] == first_event:
-            next_xpts[pid] = next_xpts.get(pid, 0.0) + (r["xpts"] or 0.0)
         next_opp.setdefault(pid, []).append(
             {
                 "opp": r["opp"],
@@ -613,8 +609,6 @@ def player_table(conn: sqlite3.Connection) -> list[dict[str, Any]]:
                 "status": r["status"] or "a",
                 "news": r["news"] or "",
                 "chance": r["chance_of_playing_next_round"],
-                "xpts_next": round(next_xpts.get(pid, 0.0), 2),
-                "xpts_horizon": round(horizon.get(pid, 0.0), 2),
                 "fixtures": fixtures,
                 "next_opponent": fixtures[0] if fixtures else None,
                 "crowd": crowd.get(pid),
@@ -1009,7 +1003,8 @@ def _player_meetings(
     marks = ",".join("?" for _ in opponents)
     sql = f"""
         SELECT season, round, opponent_team_name AS opp, was_home, minutes,
-               goals_scored, assists, defensive_contribution, total_points
+               goals_scored, assists, defensive_contribution, total_points,
+               saves, goals_conceded
         FROM historical_player_gw
         WHERE player_code = ? AND season <> ? AND minutes > 0
           AND opponent_team_name IN ({marks})
@@ -1028,6 +1023,10 @@ def _player_meetings(
                 # DefCon only exists from 2025/26. Older rows store a zero,
                 # which is a missing stat rather than a quiet defensive shift.
                 "defcon": r["defensive_contribution"] if r["season"] in defcon_seasons else None,
+                # Keepers are scored on these two rather than on goals and
+                # assists; the page shows whichever pair the position earns.
+                "saves": r["saves"] or 0,
+                "conceded": r["goals_conceded"] or 0,
                 "points": r["total_points"] or 0,
             }
         )
@@ -1041,7 +1040,8 @@ def _current_player_meetings(
     out: dict[int, list[dict[str, Any]]] = {}
     for r in conn.execute(
         "SELECT round, opponent_team, was_home, minutes, goals_scored, assists, "
-        "defensive_contribution, total_points FROM player_gw_history "
+        "defensive_contribution, total_points, saves, goals_conceded "
+        "FROM player_gw_history "
         "WHERE player_id = ? AND minutes > 0 ORDER BY round DESC",
         (player_id,),
     ):
@@ -1054,6 +1054,8 @@ def _current_player_meetings(
                 "goals": r["goals_scored"] or 0,
                 "assists": r["assists"] or 0,
                 "defcon": r["defensive_contribution"],
+                "saves": r["saves"] or 0,
+                "conceded": r["goals_conceded"] or 0,
                 "points": r["total_points"] or 0,
             }
         )

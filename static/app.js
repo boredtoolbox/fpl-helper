@@ -12,18 +12,12 @@
     return isNaN(num) ? -Infinity : num;
   }
 
-  /* An expanded row adds a second <tr> straight after its own. Sorting and
-     filtering both work on the player rows alone and carry the detail along,
-     so re-sorting an open row does not strand its panel under someone else. */
+  /* Every row in the body is a player. The per-opponent history used to open
+     as a second <tr> underneath, which both the sorter and the filter had to
+     know about and carry; it opens in a panel beside the table now, so there
+     is nothing here but players. */
   function mainRows(table) {
-    return Array.prototype.filter.call(table.tBodies[0].rows, function (row) {
-      return row.dataset.detailFor === undefined;
-    });
-  }
-
-  function detailFor(row) {
-    var next = row.nextElementSibling;
-    return next && next.dataset.detailFor !== undefined ? next : null;
+    return Array.prototype.slice.call(table.tBodies[0].rows);
   }
 
   function sortTable(table, index, type, direction) {
@@ -37,12 +31,7 @@
       return 0;
     });
     var fragment = document.createDocumentFragment();
-    rows.forEach(function (row) {
-      // Read the pairing before moving anything: appending detaches the row.
-      var detail = detailFor(row);
-      fragment.appendChild(row);
-      if (detail) fragment.appendChild(detail);
-    });
+    rows.forEach(function (row) { fragment.appendChild(row); });
     body.appendChild(fragment);
   }
 
@@ -98,8 +87,6 @@
           if (mode === 'min' && parseFloat(actual) < parseFloat(value)) visible = false;
         });
         row.hidden = !visible;
-        var detail = detailFor(row);
-        if (detail) detail.hidden = !visible;
         if (visible) shown++;
       });
       if (counter) counter.textContent = shown + ' of ' + rows.length;
@@ -117,7 +104,7 @@
       initSorting(table);
       if (table.id) initFilters(table);
       initCellTips(table);
-      if (table.dataset.opponentsBase) initExpanders(table);
+      if (table.dataset.opponentsBase) initPlayerPanel(table);
       initCompare(table);
     });
 
@@ -192,6 +179,10 @@
     var tips = Array.prototype.map.call(heads, function (th) {
       var tip = th.getAttribute('title');
       if (!tip) return '';
+      // Some columns keep their own. The Player cell says the full name and
+      // nothing else: lending it the header's paragraph buries the one thing
+      // it is there to tell you under an essay about what the column is.
+      if (th.dataset.notip !== undefined) return '';
       var label = (th.textContent || '').trim();
       return label ? label + ' — ' + tip : tip;
     });
@@ -204,9 +195,6 @@
       // its own table, which means nothing here — column 5 there is not column
       // 5 of the explorer, and lending it xA/90's tooltip would be a lie.
       if (cell.closest('table') !== table) return;
-      var row = cell.parentNode;
-      // The expanded panel spans every column; it has no column of its own.
-      if (!row || row.dataset.detailFor !== undefined) return;
       cell.dataset.tipped = '';
       var tip = tips[cell.cellIndex];
       if (!tip) return;
@@ -440,9 +428,15 @@
         // A pick stays in the strip while the table is filtered down past it,
         // and `hidden` rides along on the clone if it is not taken off.
         clone.hidden = false;
-        clone.classList.remove('picked', 'expanded');
-        var caret = clone.querySelector('[data-expand]');
-        if (caret) caret.remove();
+        clone.classList.remove('picked', 'viewing');
+        // The name is a button in the table, where it opens the panel. In the
+        // strip it is a label: swap it for its own text rather than leaving a
+        // control that looks live and is not.
+        var opener = clone.querySelector('[data-open-player]');
+        if (opener) {
+          opener.parentNode.replaceChild(
+            document.createTextNode(opener.textContent || ''), opener);
+        }
         var name = row.querySelector('td.name');
         clone.cells[0].innerHTML = dropButton(row, name ? name.dataset.sort : '');
         return clone;
@@ -611,12 +605,18 @@
     render();
   }
 
-  /* --- Expandable per-opponent history -----------------------------------
+  /* --- The player panel ---------------------------------------------------
 
      The table ships without any of this: six opponents' worth of match history
      for seven hundred players is far more markup than a page needs, and almost
-     none of it is ever opened. A row fetches its own when you open it, and the
-     answer is kept for the rest of the visit. */
+     none of it is ever opened. A player fetches their own when you open them,
+     and the answer is kept for the rest of the visit.
+
+     It used to open as a second row underneath, which put a tall block of
+     prose in the middle of a table you were reading down and pushed everyone
+     below it off the screen. It opens beside the table now: the rows stay
+     where they are, and clicking down a sorted column swaps the panel without
+     the table moving at all. */
   var opponentCache = {};
 
   function esc(value) {
@@ -625,59 +625,108 @@
       .replace(/"/g, '&quot;');
   }
 
-  function initExpanders(table) {
+  function initPlayerPanel(table) {
     var base = table.dataset.opponentsBase;
+    var drawer = document.querySelector('[data-player-drawer]');
+    var scrim = document.querySelector('[data-drawer-scrim]');
+    if (!drawer) return;
+
+    var body = drawer.querySelector('[data-drawer-body]');
+    var title = drawer.querySelector('[data-drawer-title]');
+    var sub = drawer.querySelector('[data-drawer-sub]');
+    var current = null;      // the row whose panel is showing
+    var trigger = null;      // what to hand focus back to on close
+    var hideTimer = null;
+
+    function open(row, button) {
+      if (current === row) { close(); return; }
+      if (current) current.classList.remove('viewing');
+      current = row;
+      trigger = button;
+      row.classList.add('viewing');
+
+      var cell = row.querySelector('td.name');
+      title.textContent = (cell && cell.getAttribute('title'))
+        || (button.textContent || '').trim();
+      sub.textContent = [row.dataset.pos, row.dataset.team,
+                         row.dataset.price ? '\u00a3' + row.dataset.price + 'm' : '']
+        .filter(Boolean).join(' \u00b7 ');
+
+      if (hideTimer) { window.clearTimeout(hideTimer); hideTimer = null; }
+      drawer.hidden = false;
+      if (scrim) scrim.hidden = false;
+      // A frame between "in the DOM" and "open" is what the slide transitions
+      // from; set both in the same frame and there is no start state to move
+      // off, so it simply appears.
+      window.requestAnimationFrame(function () {
+        drawer.classList.add('open');
+        if (scrim) scrim.classList.add('open');
+      });
+      drawer.scrollTop = 0;
+      drawer.focus();
+      fill(row.dataset.player);
+    }
+
+    function fill(id) {
+      if (opponentCache[id]) {
+        body.innerHTML = renderDetail(opponentCache[id]);
+        return;
+      }
+      body.innerHTML = '<div class="detail is-loading">Looking up the record\u2026</div>';
+      fetch(base + '/' + encodeURIComponent(id) + '/opponents', {
+        headers: { 'Accept': 'application/json' }, cache: 'no-store'
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error('status ' + response.status);
+          return response.json();
+        })
+        .then(function (payload) {
+          opponentCache[id] = payload;
+          // Someone impatient may already have clicked on; only paint if this
+          // is still the player being shown.
+          if (current && current.dataset.player === id) {
+            body.innerHTML = renderDetail(payload);
+          }
+        })
+        .catch(function () {
+          if (current && current.dataset.player !== id) return;
+          body.innerHTML = '<div class="detail is-loading">Could not load the record \u2014 '
+            + 'the app may be mid-refresh. Close and reopen to try again.</div>';
+        });
+    }
+
+    function close() {
+      if (current) current.classList.remove('viewing');
+      current = null;
+      drawer.classList.remove('open');
+      if (scrim) scrim.classList.remove('open');
+      // Kept in the DOM until the slide is over, then taken out of the tab
+      // order properly rather than left transparent and still focusable.
+      hideTimer = window.setTimeout(function () {
+        if (drawer.classList.contains('open')) return;
+        drawer.hidden = true;
+        if (scrim) scrim.hidden = true;
+      }, 220);
+      if (trigger && document.contains(trigger)) trigger.focus();
+      trigger = null;
+    }
 
     table.addEventListener('click', function (event) {
-      var button = event.target.closest('[data-expand]');
+      var button = event.target.closest('[data-open-player]');
       if (!button) return;
       var row = button.closest('tr');
       if (!row) return;
       event.preventDefault();
-      toggle(table, base, row, button);
+      open(row, button);
     });
-  }
 
-  function toggle(table, base, row, button) {
-    var open = detailFor(row);
-    if (open) {
-      open.remove();
-      button.setAttribute('aria-expanded', 'false');
-      row.classList.remove('expanded');
-      return;
-    }
-
-    var detail = row.ownerDocument.createElement('tr');
-    detail.dataset.detailFor = row.dataset.player || '';
-    detail.className = 'detail-row';
-    var cell = row.ownerDocument.createElement('td');
-    cell.colSpan = row.cells.length;
-    cell.innerHTML = '<div class="detail is-loading">Looking up the record…</div>';
-    detail.appendChild(cell);
-    row.parentNode.insertBefore(detail, row.nextSibling);
-    button.setAttribute('aria-expanded', 'true');
-    row.classList.add('expanded');
-
-    var id = row.dataset.player;
-    if (opponentCache[id]) {
-      cell.innerHTML = renderDetail(opponentCache[id]);
-      return;
-    }
-    fetch(base + '/' + encodeURIComponent(id) + '/opponents', {
-      headers: { 'Accept': 'application/json' }, cache: 'no-store'
-    })
-      .then(function (response) {
-        if (!response.ok) throw new Error('status ' + response.status);
-        return response.json();
-      })
-      .then(function (payload) {
-        opponentCache[id] = payload;
-        cell.innerHTML = renderDetail(payload);
-      })
-      .catch(function () {
-        cell.innerHTML = '<div class="detail is-loading">Could not load the record — '
-          + 'the app may be mid-refresh. Close and reopen to try again.</div>';
-      });
+    drawer.addEventListener('click', function (event) {
+      if (event.target.closest('[data-drawer-close]')) close();
+    });
+    if (scrim) scrim.addEventListener('click', close);
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !drawer.hidden) close();
+    });
   }
 
   function fixtureLabel(fixture) {
@@ -702,38 +751,130 @@
     return '<span class="meet none">' + esc(why) + '</span>';
   }
 
-  function teamLine(fixture, player) {
-    var runs = fixture.team_form || [];
-    if (!runs.length) return nothing(fixture, player);
-    return runs.map(function (m) {
-      var kind = m.result === 'W' ? 'win' : (m.result === 'L' ? 'loss' : 'draw');
-      return '<span class="meet ' + kind + '" title="' + esc(when(m, fixture)) + '">'
-        + '<b>' + esc(m.result) + '</b> ' + esc(m.scored) + '–' + esc(m.against) + '</span>';
+  /* --- The two opponent blocks --------------------------------------------
+
+     Both are real tables, for the same reason the season log below them is:
+     they are grids of numbers over a shared set of columns, and the whole job
+     is comparing one meeting with the next. Chips on a line cannot do that —
+     nothing lines up, so the eye has no column to run down.
+
+     One table per block rather than one per opponent, with the opponent held
+     in a `rowspan` cell down the left. That is what keeps it a table: a single
+     header row over all six opponents, and every number under the heading that
+     names it. */
+
+  /* The run of meetings for one opponent, as rows of an existing table. The
+     first row of each group carries the opponent cell and the rule above it. */
+  function groupRows(fixtures, player, width, runsOf, cells) {
+    return fixtures.map(function (fixture) {
+      var runs = runsOf(fixture) || [];
+      var opp = '<td class="rec-opp"' + (runs.length > 1 ? ' rowspan="' + runs.length + '"' : '')
+        + '>' + fixtureLabel(fixture) + '</td>';
+      if (!runs.length) {
+        return '<tr class="rec-first">' + opp + '<td colspan="' + width + '">'
+          + (fixture.known && player.club_known
+              ? '<span class="meet none">no appearances against them</span>'
+              : nothing(fixture, player))
+          + '</td></tr>';
+      }
+      return runs.map(function (m, i) {
+        return '<tr' + (i === 0 ? ' class="rec-first"' : '') + '>'
+          + (i === 0 ? opp : '')
+          + '<td class="rec-when">' + esc(m.season) + '</td>'
+          + '<td class="num">GW' + esc(m.round) + '</td>'
+          + '<td class="rec-venue">' + (m.home ? 'Home' : 'Away') + '</td>'
+          + cells(m) + '</tr>';
+      }).join('');
     }).join('');
   }
 
-  function playerLine(fixture, player) {
-    var threshold = player.defcon_threshold;
-    var runs = fixture.player_form || [];
-    if (!runs.length) {
-      return fixture.known && player.club_known
-        ? '<span class="meet none">no appearances against them</span>'
-        : nothing(fixture, player);
+  function logTable(head, body) {
+    return '<div class="gwlog-wrap"><table class="gwlog rec-table">'
+      + '<thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
+  }
+
+  function renderClub(fixtures, player, limit) {
+    var title = (player.team_name || 'The club') + ' against these opponents';
+    var head = '<tr><th>Opponent</th><th>Season</th><th class="num">GW</th>'
+      + '<th>Venue</th><th>Result</th><th class="num">Score</th></tr>';
+    var body = groupRows(fixtures, player, 3,
+      function (fixture) { return fixture.team_form; },
+      function (m) {
+        var kind = m.result === 'W' ? 'win' : (m.result === 'L' ? 'loss' : 'draw');
+        return '<td><span class="res ' + kind + '">' + esc(m.result) + '</span></td>'
+          + '<td class="num">' + esc(m.scored) + '\u2013' + esc(m.against) + '</td>';
+      });
+    return '<section class="detail-block"><h4 class="detail-title">' + esc(title)
+      + '<span class="detail-note">last ' + esc(limit)
+      + ', most recent first</span></h4>' + logTable(head, body) + '</section>';
+  }
+
+  /* Which numbers a position is scored on — the same rule the season log
+     applies to its own columns. A keeper's goals and assists are a column of
+     noughts; a keeper's saves are a point for every three of them, and a clean
+     sheet is worth four. */
+  function recordColumns(player) {
+    if (player.position === 'GKP') {
+      return [
+        { label: 'Saves', read: function (m) {
+            var n = m.saves || 0;
+            return { text: n, on: n >= 3, tip: n + ' saves — a point for every three' };
+          } },
+        { label: 'Conceded', read: function (m) {
+            var n = m.conceded || 0;
+            return { text: n, on: n === 0, tip: n === 0 ? 'Clean sheet' : n + ' conceded' };
+          } }
+      ];
     }
-    return runs.map(function (m) {
-      var defcon = '<span class="pf">DC —</span>';
-      if (m.defcon !== null && m.defcon !== undefined) {
-        // A count on its own means nothing without the bar it had to clear.
-        var hit = threshold && m.defcon >= threshold;
-        defcon = '<span class="pf' + (hit ? ' on' : '') + '">DC ' + esc(m.defcon) + '</span>';
-      }
-      return '<span class="perf" title="' + esc(when(m, fixture)) + ' · '
-        + esc(m.minutes) + ' mins · ' + esc(m.points) + ' pts">'
-        + '<span class="pf-min">' + esc(m.minutes) + '\u2032</span>'
-        + '<span class="pf' + (m.goals ? ' on' : '') + '">G ' + esc(m.goals) + '</span>'
-        + '<span class="pf' + (m.assists ? ' on' : '') + '">A ' + esc(m.assists) + '</span>'
-        + defcon + '</span>';
-    }).join('');
+    return [
+      { label: 'Goals', read: function (m) {
+          return { text: m.goals || 0, on: !!m.goals };
+        } },
+      { label: 'Assists', read: function (m) {
+          return { text: m.assists || 0, on: !!m.assists };
+        } },
+      { label: 'DefCon', read: function (m) {
+          // A count on its own means nothing without the bar it had to clear.
+          if (m.defcon === null || m.defcon === undefined) {
+            return { text: '\u2014', dim: true, tip: 'DefCon was not recorded before 2025/26' };
+          }
+          var hit = player.defcon_threshold && m.defcon >= player.defcon_threshold;
+          return { text: m.defcon, on: hit,
+                   tip: hit ? 'Cleared ' + player.defcon_threshold + ' — 2 points'
+                            : 'Needed ' + player.defcon_threshold };
+        } }
+    ];
+  }
+
+  function renderRecord(fixtures, player) {
+    var title = (player.name || 'This player') + '\u2019s own record against next opponents';
+    var cols = recordColumns(player);
+    var head = '<tr><th>Opponent</th><th>Season</th><th class="num">GW</th>'
+      + '<th>Venue</th><th class="num">Mins</th>'
+      + cols.map(function (c) { return '<th class="num">' + esc(c.label) + '</th>'; }).join('')
+      + '<th class="num">Pts</th></tr>';
+    var body = groupRows(fixtures, player, cols.length + 2,
+      function (fixture) { return fixture.player_form; },
+      function (m) {
+        return '<td class="num">' + esc(m.minutes) + '\u2032</td>'
+          + cols.map(function (c) {
+              var v = c.read(m);
+              return '<td class="num"' + (v.tip ? ' title="' + esc(v.tip) + '"' : '') + '>'
+                + '<span class="' + (v.on ? 'on' : (v.dim ? 'dim' : '')) + '">'
+                + esc(v.text) + '</span></td>';
+            }).join('')
+          + '<td class="num"><span class="pts' + haul(m.points) + '">'
+          + esc(m.points) + '</span></td>';
+      });
+    return '<section class="detail-block"><h4 class="detail-title">' + esc(title)
+      + '</h4>' + logTable(head, body) + '</section>';
+  }
+
+  /* Three bands, not a gradient: a haul, a useful return, and a blank. */
+  function haul(points) {
+    if (points >= 8) return ' big';
+    if (points >= 5) return ' ok';
+    return '';
   }
 
   /* --- This season, game by game ------------------------------------------
@@ -963,16 +1104,6 @@
       + '</table></div></section>';
   }
 
-  function renderBlock(title, note, fixtures, player, line) {
-    var rows = fixtures.map(function (fixture) {
-      return '<div class="opp-line"><span class="opp-fix">' + fixtureLabel(fixture)
-        + '</span><span class="opp-runs">' + line(fixture, player) + '</span></div>';
-    }).join('');
-    return '<section class="detail-block"><h4 class="detail-title">' + esc(title)
-      + '<span class="detail-note">' + esc(note) + '</span></h4>'
-      + '<div class="opp-list">' + rows + '</div></section>';
-  }
-
   function renderDetail(payload) {
     var player = payload.player || {};
     var fixtures = payload.fixtures || [];
@@ -990,14 +1121,8 @@
     }
     return '<div class="detail">'
       + log
-      + renderBlock(
-          (player.team_name || 'The club') + ' against these opponents',
-          'last ' + limit + ', most recent first',
-          fixtures, player, teamLine)
-      + renderBlock(
-          (player.name || 'This player') + '\u2019s own record',
-          'goals, assists and defensive contributions, appearances only',
-          fixtures, player, playerLine)
+      + renderClub(fixtures, player, limit)
+      + renderRecord(fixtures, player)
       + '</div>';
   }
 

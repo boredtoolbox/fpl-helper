@@ -137,8 +137,9 @@ one, use the source install below.
 
 Run it, and a browser opens on a short setup page: your FPL team id, and
 optionally a Gemini key. It fetches everything else itself and refreshes daily
-at 6am from then on. No Python, no virtualenv, no cron, no config file to
-edit.
+at 6am for as long as you leave it running. No Python, no virtualenv, no cron,
+no config file to edit. It is a program you start, though, not a service that
+starts itself — see [Keeping it running](#keeping-it-running).
 
 ### Getting past the security warning
 
@@ -176,6 +177,66 @@ there is no authentication; `run.py` is the entry point that serves a network.
 
 The first fetch takes 10-15 minutes, almost all of it walking the FPL API at
 one request per second. Later refreshes take seconds.
+
+### Keeping it running
+
+It is a plain foreground program, not a background service. It runs for
+exactly as long as the window you started it from stays open, which is what
+"Close this window to stop." in its own output means:
+
+| What you do | What happens |
+| --- | --- |
+| Close the terminal window, or quit the terminal app | The server stops. The page in your browser stops loading. |
+| Ctrl-C in that window | The same, deliberately. |
+| Close the *browser* tab | Nothing. The server is still up; reopen the URL. |
+| Log out, reboot or shut down | The server stops, and **nothing starts it again for you**. |
+
+Nothing is installed anywhere. There is no login item, no launch agent and no
+service registered, so after a reboot the app is not running until you start
+it yourself — run the same file again:
+
+```bash
+~/Downloads/fpl-helper-macos-arm64        # macOS
+~/Downloads/fpl-helper-linux-x86_64       # Linux
+```
+
+The `chmod +x` and the Gatekeeper prompt above are first-run only; later runs
+are just the file. Somewhere more permanent than `Downloads` is worth the
+thirty seconds:
+
+```bash
+mkdir -p ~/bin && mv ~/Downloads/fpl-helper-macos-arm64 ~/bin/fpl-helper
+~/bin/fpl-helper
+```
+
+**Setup does not repeat.** Your team id, key, database and downloaded images
+are in the state directory above, not in the executable, so the second run
+skips the setup page and goes straight to your squad. Restarting costs a few
+seconds, not another 10-15 minute fetch.
+
+**The port is 8000 if it can get it.** If something else holds 8000 — most
+often a copy you forgot was already running — it tries 8001, then 8002, up to
+8019, and serves on the first one that is free. So do not assume the address:
+read the URL it prints, which is the one it opens the browser on. If all
+twenty are taken it says so and exits rather than guessing.
+
+**The 6am refresh only happens while the app is open.** It is a thread inside
+this process, not cron, and a process that is not running cannot refresh
+anything:
+
+* Asleep at 6am with the app still running — it fires on wake, as long as that
+  is within the hour. Later than that, it is skipped.
+* Shut down at 6am, or the app closed — that day's refresh does not happen.
+  Starting the app at 9am does not backfill it; the next one is tomorrow at 6.
+
+After the machine has been off for a day or two, press "Refresh now" once and
+you are current. Nothing is lost by missing a day — a refresh fetches the
+present state of the season, it does not accumulate.
+
+If you want it up without thinking about it, that is the case for putting it
+on something that is always on: see [Install on Linux](#install-on-linux) and
+the systemd unit under [Run it as a service](#run-it-as-a-service), which is
+built for exactly this and survives both reboots and crashes.
 
 ### Your own key, your own data
 

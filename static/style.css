@@ -863,40 +863,29 @@ tbody tr:hover .b-bad  { background: rgba(var(--bad-rgb),0.19); }
 .team-pill.on .tp-id { color: var(--accent-dim); }
 .team-bar-note { font-size: 0.74rem; color: var(--faint); margin-left: auto; }
 
-/* --- Expandable per-opponent history ------------------------------------
-   A caret in the name cell opens a panel spanning the table: the club's recent
-   results against each of the next six opponents, then the player's own record
-   in those games. */
-/* Sized and bordered like the button it is. The first cut drew a 10px glyph in
-   --faint with no box around it, which read as punctuation attached to the name
-   rather than as something you could click. */
-.caret {
-  width: 19px;
-  height: 19px;
+/* --- The player panel ----------------------------------------------------
+   Clicking a name opens a panel from the right: the club's recent results
+   against each of the next six opponents, then the player's own record in
+   those games. The caret that used to open it underneath is gone — the name
+   is the control now, so there is one fewer thing in a crowded first column
+   and a target the width of a word instead of nineteen pixels. */
+.name-open {
   padding: 0;
-  margin-right: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  background: var(--ink-750);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-size: 0.8rem;
-  line-height: 1;
-  transition: transform 0.15s ease, color 0.15s ease,
-              background 0.15s ease, border-color 0.15s ease;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  /* Underlined on the offer rather than on hover: in a table of seven hundred
+     names, something you can click should say so before the pointer is on it. */
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--faint-rgb), 0.55);
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
-.caret:hover { color: var(--accent); border-color: var(--accent); background: var(--ink-700); }
-/* Open reads as filled rather than outlined, so a row you have expanded is
-   obvious when several are. */
-.caret[aria-expanded="true"] {
-  color: var(--ink-900);
-  background: var(--accent);
-  border-color: var(--accent);
-  transform: rotate(180deg);
-}
+.name-open:hover { color: var(--accent); text-decoration-color: var(--accent); }
+.name-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .caret-key {
   color: var(--text-2);
   background: var(--ink-750);
@@ -905,11 +894,82 @@ tbody tr:hover .b-bad  { background: rgba(var(--bad-rgb),0.19); }
   padding: 0 4px;
   font-size: 0.72rem;
 }
-tr.expanded { background: var(--ink-750); }
-tr.expanded td { border-bottom-color: transparent; }
+/* Which row the panel is showing. The amber edge is the same device the
+   comparison ticks use, on the other side of the row so the two can both be
+   true at once without either being ambiguous. */
+tbody tr.viewing { background: var(--ink-750); }
+tbody tr.viewing:hover { background: var(--ink-700); }
+tbody tr.viewing td.name { box-shadow: inset -2px 0 0 var(--accent); }
+tbody tr.viewing .name-open { color: var(--accent); text-decoration-color: var(--accent); }
 
-.detail-row > td { padding: 0; background: var(--ink-850); white-space: normal; }
-tbody tr.detail-row:hover { background: var(--ink-850); }
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 94vw);
+  height: 100vh;
+  background: var(--ink-850);
+  border-left: 1px solid rgba(var(--accent-rgb), 0.28);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+}
+.drawer.open { transform: translateX(0); }
+.drawer[hidden] { display: none; }
+.drawer:focus { outline: none; }
+.drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 auto;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--ink-800);
+}
+.drawer-heading { min-width: 0; }
+.drawer-heading h3 { margin: 2px 0 0; font-size: 1.05rem; }
+.drawer-close {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink-750);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.drawer-close:hover { color: var(--accent); border-color: var(--accent); background: var(--ink-700); }
+/* The panel scrolls, not the page behind it: the season log alone can run to
+   forty rows, and a panel that scrolls the document would drag the table out
+   from under the row you opened. */
+.drawer-body { flex: 1 1 auto; overflow: auto; overscroll-behavior: contain; }
+/* One column. The grid exists to put the two opponent blocks side by side in
+   the full width of a table; down here there is only ever one column of room,
+   and its top border belongs to the head above instead. */
+.drawer-body .detail { grid-template-columns: 1fr; border-top: 0; }
+
+/* Only where the panel covers the page rather than sitting beside it — see
+   the breakpoint below, which is where it goes full width. */
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  display: none;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.drawer-scrim.open { opacity: 1; }
+.drawer-scrim[hidden] { display: none; }
 .detail {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
@@ -939,27 +999,12 @@ tbody tr.detail-row:hover { background: var(--ink-850); }
 }
 .detail-note { text-transform: none; letter-spacing: 0.02em; color: var(--faint); font-weight: 400; }
 
-.opp-list { display: flex; flex-direction: column; gap: 5px; }
-.opp-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.opp-fix {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 92px;
-}
 .opp-gw {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--faint);
   letter-spacing: 0.04em;
 }
-.opp-runs { display: inline-flex; gap: 4px; flex-wrap: wrap; }
-
 /* The fixture chips in an expanded row can afford to be bigger than the ones
    in the table: the panel has one row's worth of width to play with, where the
    Next 6 column is squeezed between nineteen others. Scoped so bumping one
@@ -970,20 +1015,9 @@ tbody tr.detail-row:hover { background: var(--ink-850); }
   padding: 3px 5px;
 }
 
-/* One past meeting. Result first because that is what the eye is scanning for,
-   the scoreline after it for the detail. */
-.meet {
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  padding: 3px 8px;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-.meet b { font-weight: 600; margin-right: 2px; }
-.meet.win  { background: rgba(var(--good-rgb),0.14); color: var(--good-text); border-color: rgba(var(--good-rgb),0.28); }
-.meet.draw { background: rgba(var(--faint-rgb),0.22); color: var(--text-2); border-color: rgba(var(--faint-rgb),0.35); }
-.meet.loss { background: rgba(var(--bad-rgb),0.13); color: var(--bad-text); border-color: rgba(var(--bad-rgb),0.3); }
+/* An opponent with nothing to report: never met, or one of the two clubs is
+   new to the league. The only survivor of the chip layout these blocks used
+   to have — results are table cells now. */
 .meet.none {
   font-family: var(--font-body);
   font-size: 0.85rem;
@@ -992,24 +1026,51 @@ tbody tr.detail-row:hover { background: var(--ink-850); }
   padding-left: 0;
 }
 
-/* One past appearance: minutes, then the three returns that were asked for. */
-.perf {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 7px;
-  padding: 3px 9px;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  background: var(--ink-800);
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
+/* --- The two opponent blocks ---------------------------------------------
+   Both are `.gwlog` tables, so they inherit the season log's cell padding,
+   rules, hover and number alignment and the three value states (.on / .dim /
+   .off) without restating any of it. Only what is particular to them is here.
+
+   They were chips on a line first, and a line of chips is the one shape that
+   cannot answer the question these blocks are asked: is this run better than
+   that one. Nothing lines up, so there is no column to read down. */
+.rec-table { width: 100%; }
+/* The opponent, held down the left across its whole run of meetings. Top
+   aligned so it sits against the first row of the group rather than floating
+   in the middle of five. */
+.rec-table td.rec-opp {
+  vertical-align: top;
   white-space: nowrap;
+  border-right: 1px solid var(--line-soft);
+  background: rgba(var(--ink-850-rgb), 0.6);
 }
-.perf .pf-min { color: var(--faint); }
-.perf .pf { color: var(--muted); }
-/* Anything that actually returned. A goal, an assist, or a defensive shift that
-   cleared this position's DefCon threshold and banked the two points. */
-.perf .pf.on { color: var(--accent); font-weight: 600; }
+/* The rule between opponents is the group's, not the row's: heavier than the
+   line between two meetings of the same club, so the groups read as groups. */
+.rec-table tbody tr.rec-first > td { border-top: 1px solid var(--line); }
+.rec-table tbody tr:first-child > td { border-top: 0; }
+.rec-table .rec-when { color: var(--faint); white-space: nowrap; }
+.rec-table .rec-venue { color: var(--muted); }
+/* W/D/L in the same three colours the fixture bars use, without the chip: a
+   single letter in a column of single letters needs no box around it. */
+.rec-table .res { font-weight: 700; }
+.rec-table .res.win  { color: var(--good-text); }
+.rec-table .res.draw { color: var(--text-2); }
+.rec-table .res.loss { color: var(--bad-text); }
+/* What the match was worth. Three bands, not a gradient: a haul, a useful
+   return, and a blank. */
+.rec-table .pts { color: var(--muted); font-weight: 600; }
+.rec-table .pts.ok {
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+  border-radius: var(--radius);
+  padding: 1px 5px;
+}
+.rec-table .pts.big {
+  color: var(--ink-900);
+  background: var(--accent);
+  border-radius: var(--radius);
+  padding: 1px 5px;
+}
 
 /* --- This season, game by game -------------------------------------------
    The first of the three blocks in an expanded row. It is a real <table>
@@ -1806,6 +1867,12 @@ tbody tr.picked td.cmp-cell { box-shadow: inset 2px 0 0 var(--accent); }
   /* Forced to stack, the beside panel is what you want in front of you rather
      than below 650 rows. The below layout is already in its intended order. */
   .compare-layout:not(.stacked) > .compare-panel { order: -1; }
+
+  /* Wide enough to sit beside the table above this width; below it the panel
+     is over the page, so it says so — a scrim, and a tap anywhere off it
+     closes. That is the one place this behaves modally. */
+  .drawer { width: min(680px, 100vw); }
+  .drawer-scrim { display: block; }
 }
 
 /* --- Responsive --------------------------------------------------------- */
