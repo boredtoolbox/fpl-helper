@@ -18,7 +18,7 @@ from .logging_setup import setup_logging
 
 log = logging.getLogger(__name__)
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 def _start_scheduler(app: Flask, cfg: Config) -> None:
