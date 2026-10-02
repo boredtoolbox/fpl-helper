@@ -801,10 +801,31 @@ process.
 ```bash
 cd ~/fpl-helper
 git pull
-.venv/bin/pip install -r requirements.txt
+
+# Only if requirements.txt changed in the release. Use the interpreter the
+# unit file actually runs -- an Option B box has no .venv to install into.
+.venv/bin/pip install -r requirements.txt      # Option A or C
+pip3 install --user -r requirements.txt        # Option B
+
 sudo systemctl restart fpl-helper
 systemctl status fpl-helper
 ```
+
+If the machine is one you deploy to rather than develop on, there may be no
+checkout to pull: push the code over instead, and never let the copy carry your
+own `config.yaml`, `data/`, `logs/` or `secrets/` onto it — the target owns
+those, and overwriting them replaces a live database with a stale one.
+
+```bash
+rsync -avz \
+  --exclude '__pycache__' --exclude '.git' \
+  --exclude 'data/' --exclude 'logs/' --exclude 'secrets/' \
+  --exclude 'config.yaml' --exclude 'context.md' \
+  --exclude 'static/kits/' --exclude 'static/crests/' \
+  ~/fpl-helper/ <user>@<host>:~/fpl-helper/
+```
+
+Add `-n` first to see what it would send. Never add `--delete`.
 
 The unit file itself is yours, not the repository's — it lives in
 `/etc/systemd/system/` and a pull never overwrites it. Only run
