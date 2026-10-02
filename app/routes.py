@@ -9,6 +9,7 @@ from flask import (
     session, url_for,
 )
 
+from . import __version__
 from .db import REFRESH_LOCK, connect
 from .views import (
     active_job, data_freshness, data_version, entry_stats,
@@ -64,6 +65,9 @@ def inject_globals():
             "data_version": data_version(conn),
             "refresh_running": bool(job) or REFRESH_LOCK.is_running,
             "refresh_stage": (job or {}).get("stage") or REFRESH_LOCK.stage,
+            # In the footer, so "which version am I on?" has an answer that does
+            # not depend on having a terminal or a checkout to inspect.
+            "app_version": __version__,
         }
     finally:
         conn.close()

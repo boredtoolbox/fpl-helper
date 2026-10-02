@@ -25,7 +25,7 @@ datas = []
 for html in sorted((PROJECT / "templates").glob("*.html")):
     datas.append((str(html), "templates"))
 
-for asset in ("style.css", "app.js"):
+for asset in ("style.css", "app.js", "theme.js"):
     path = PROJECT / "static" / asset
     if not path.exists():
         raise SystemExit(f"spec: expected {path} to exist")

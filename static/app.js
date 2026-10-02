@@ -119,11 +119,64 @@
       });
     });
 
+    initTheme();
     initTabs();
     initTableFill();
     initMatchweekStrip();
     initAutoUpdate();
   });
+
+  /* The theme switch. static/theme.js has already resolved which theme is on
+     and stamped it on <html> before the first paint; all this does is label the
+     button and swap the attribute when it is pressed.
+
+     Two states, not three. FPL ships light and dark and nothing else, and the
+     "follow the system" case is the starting position rather than a third thing
+     to choose: data-theme-source says `system` until the reader presses this,
+     and only while it does are OS changes still followed. */
+  function initTheme() {
+    var KEY = 'fpl-helper-theme';
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll('[data-theme-toggle]');
+    if (!buttons.length) return;
+
+    function label() {
+      var dark = root.getAttribute('data-theme') === 'dark';
+      /* The glyph is what you are switching TO, which is the one of the two
+         readings people reliably agree on. */
+      Array.prototype.forEach.call(buttons, function (button) {
+        button.textContent = dark ? '\u2600' : '\u263d';
+        var title = dark ? 'Switch to the light theme' : 'Switch to the dark theme';
+        button.title = title;
+        button.setAttribute('aria-label', title);
+      });
+    }
+
+    Array.prototype.forEach.call(buttons, function (button) {
+      button.addEventListener('click', function () {
+        var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        root.setAttribute('data-theme-source', 'stored');
+        try { window.localStorage.setItem(KEY, next); } catch (e) {}
+        label();
+      });
+    });
+
+    /* Still following the OS, so keep following it — until the button is
+       pressed, at which point data-theme-source stops being `system`. */
+    if (window.matchMedia) {
+      var query = window.matchMedia('(prefers-color-scheme: dark)');
+      var follow = function () {
+        if (root.getAttribute('data-theme-source') !== 'system') return;
+        root.setAttribute('data-theme', query.matches ? 'dark' : 'light');
+        label();
+      };
+      if (query.addEventListener) query.addEventListener('change', follow);
+      else if (query.addListener) query.addListener(follow);
+    }
+
+    label();
+  }
 
   /* Sub-tabs. Every panel is already in the page, so switching is a matter of
      which one is hidden — no reload, and the tables inside keep whatever sort

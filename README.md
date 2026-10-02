@@ -214,6 +214,12 @@ are in the state directory above, not in the executable, so the second run
 skips the setup page and goes straight to your squad. Restarting costs a few
 seconds, not another 10-15 minute fetch.
 
+That is also why **upgrading is just replacing this file** — the same state
+directory is picked up by the new one, with no setup page and no re-fetch. See
+[Upgrading an existing install](#upgrading-an-existing-install), which has the
+one step people miss: stop the old copy first, or the new one serves on 8001
+and you are still looking at the old build.
+
 **The port is 8000 if it can get it.** If something else holds 8000 — most
 often a copy you forgot was already running — it tries 8001, then 8002, up to
 8019, and serves on the first one that is free. So do not assume the address:
@@ -696,6 +702,132 @@ account has no real home directory for `pip install --user` to write into.
 The service only serves pages. Both data jobs belong to the scheduler, so the
 site stays up independently of whether a refresh succeeded. See
 [Scheduling](#scheduling).
+
+---
+
+## Upgrading an existing install
+
+**Nothing you care about lives in the code.** Your team ids, Gemini key,
+database, downloaded kits and crests are all in your state directory — the
+platform folder under [Where it keeps things](#where-it-keeps-things) for the
+downloadable app, or `config.yaml`, `secrets/` and `data/` inside the checkout
+for a source install. Every one of those is either outside the executable or
+gitignored, so upgrading replaces the program and leaves your install alone.
+
+There is no migration step to run. `init_db` executes on every start: new
+tables and indexes are created, and columns added since your database was
+built are applied with `ALTER TABLE` by `_add_missing_columns`. You will not be
+asked to delete anything, and **you do not re-fetch** — the first 10-15 minute
+walk of the FPL API happens once, ever.
+
+### Which version am I on?
+
+* **The footer of any page**, at the right-hand end — `v1.2.0`. This is the one
+  that works everywhere, including the downloadable app, where there is no
+  checkout to inspect and no terminal habit to rely on.
+* **From a terminal** — `fpl-helper --version` for the downloadable app, or
+  `python3 run.py --version` from a source checkout.
+* **Source installs** additionally have `git describe --tags` for the tag you
+  are on, and `git log -1 --format=%h\ %cd` for the exact commit and its date.
+
+Both of the first two arrived in **1.2.0**. If the footer shows no version and
+`--version` is not a recognised flag, you are on 1.1.0 or earlier — which is
+itself the answer, and the thing to do about it is below.
+
+Read the release notes before upgrading. Anything that *does* need a manual
+step — the rare schema change too big for `ADDED_COLUMNS`, or a config key that
+changed name — is called out there, and nowhere else.
+
+### The downloadable app
+
+1. **Stop the copy you are running.** Close its terminal window, or Ctrl-C in
+   it. This matters more than it looks: the app takes 8000 if it can get it and
+   otherwise walks up to 8019, so leaving the old one running means the new one
+   quietly serves on 8001 and you spend ten minutes looking at the old build.
+2. Download the file for your machine from
+   [Releases](https://github.com/boredtoolbox/fpl-helper/releases).
+3. Put it where the old one was, replacing it:
+
+   ```bash
+   mv ~/Downloads/fpl-helper-macos-arm64 ~/bin/fpl-helper
+   chmod +x ~/bin/fpl-helper
+   xattr -d com.apple.quarantine ~/bin/fpl-helper   # macOS only
+   ```
+
+   `chmod +x` and the `xattr` line are **not** first-run-only in the way the
+   install instructions describe. They apply to each newly downloaded file, and
+   the new binary is a new file — macOS quarantines it exactly as it did the
+   first, and Windows SmartScreen prompts again.
+4. Start it. It goes straight to your squad; setup does not repeat.
+
+Keep the old file until the new one has started cleanly if you like — that is
+the whole rollback story for the binary, along with the older assets still
+attached to every past release.
+
+### A source install
+
+```bash
+cd ~/fpl-helper
+git pull
+```
+
+`config.yaml`, `secrets/` and `data/` are gitignored, so a pull cannot touch
+them. If the pull refuses because you have edited a tracked file, `git stash`
+first and `git stash pop` after.
+
+Then reinstall dependencies, because a release may have changed
+`requirements.txt`. Match the option you installed with:
+
+```bash
+# Option A or C (virtualenv)
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Option B (--user)
+pip3 install --user -r requirements.txt
+# Debian / Ubuntu / Raspberry Pi OS 12+ may need --break-system-packages
+```
+
+Restart however you run it — Ctrl-C and `python3 run.py` again for a foreground
+process.
+
+### Running as a service
+
+```bash
+cd ~/fpl-helper
+git pull
+.venv/bin/pip install -r requirements.txt
+sudo systemctl restart fpl-helper
+systemctl status fpl-helper
+```
+
+The unit file itself is yours, not the repository's — it lives in
+`/etc/systemd/system/` and a pull never overwrites it. Only run
+`sudo systemctl daemon-reload` if a release note tells you the unit or the
+timers changed, and if the timers did:
+
+```bash
+sudo systemctl restart fpl-refresh.timer fpl-crowd.timer
+systemctl list-timers 'fpl-*'
+```
+
+### Rolling back
+
+```bash
+cd ~/fpl-helper
+git checkout v1.1.0          # or whichever tag you were on
+```
+
+For the downloadable app, every past release keeps its binaries attached, so
+the previous version is always a download away. Your database is not versioned
+and is read by both, so rolling the code back does not cost you any data.
+
+### After it comes up
+
+Press **Refresh now** once if the app has been closed for a day or two. A
+refresh fetches the present state of the season rather than accumulating, so
+nothing is lost by having missed one — but a stale page after an upgrade is
+usually stale data, not a bad build. The footer shows when each job last ran.
 
 ---
 

@@ -79,11 +79,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port (default: {DEFAULT_PORT})")
     parser.add_argument("--config", help="path to a config.yaml")
     parser.add_argument("--no-browser", action="store_true", help="do not open a browser")
+    # Not action="version": that wants the string while the parser is being
+    # built, which means importing app before the --state-dir block below has
+    # set FPL_STATE_DIR — and app.config reads that at import time.
+    parser.add_argument("--version", action="store_true", help="print the version and exit")
     parser.add_argument(
         "--state-dir",
         help="where to keep config, database and logs (default: your user data directory)",
     )
     args = parser.parse_args(argv)
+
+    if args.version:
+        from app import __version__
+
+        print(f"fpl-helper {__version__}")
+        return 0
 
     if args.state_dir:
         # Read by app.config at import time, so it has to be set before the

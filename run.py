@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import socket
 
-from app import create_app
+from app import __version__, create_app
 from app.config import ConfigError
 
 
@@ -29,6 +29,7 @@ def local_address() -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the FPL Helper web app.")
+    parser.add_argument("--version", action="version", version=f"fpl-helper {__version__}")
     parser.add_argument("--host", default="0.0.0.0", help="bind address (default: all interfaces)")
     parser.add_argument("--port", type=int, default=8000, help="port (default: 8000)")
     parser.add_argument("--config", help="path to config.yaml")

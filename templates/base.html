@@ -6,31 +6,47 @@
 <title>{% block title %}FPL Helper{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>⚽</text></svg>">
+{# Resolved before the first paint, so a dark-theme reader never sees a white
+   flash. Shared with the two setup shells — see static/theme.js. #}
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
 <body data-version="{{ data_version }}" data-status-url="{{ url_for('main.status') }}">
 
+{# Two rows, as on the official site: the purple brand bar, then the page
+   navigation beneath it. The split is what lets the brand bar stay purple in
+   both themes while the nav row follows the theme. #}
 <header class="topbar">
-  <div class="topbar-inner">
-    <span class="brand">
-      <span class="brand-mark">◆</span> FPL Helper
-      {% if gameweek.next %}<span class="brand-gw">GW{{ gameweek.next.id }} NEXT</span>
-      {% elif gameweek.current %}<span class="brand-gw">GW{{ gameweek.current.id }} LIVE</span>{% endif %}
-    </span>
+  <div class="topbar-brandrow">
+    <div class="topbar-inner">
+      <span class="brand">
+        <span class="brand-mark">◆</span> <span class="brand-word">FPL Helper</span>
+        {% if gameweek.next %}<span class="brand-gw">GW{{ gameweek.next.id }} next</span>
+        {% elif gameweek.current %}<span class="brand-gw">GW{{ gameweek.current.id }} live</span>{% endif %}
+      </span>
 
-    <nav class="pages">
-      <a href="{{ url_for('main.matches') }}" {% if request.endpoint == 'main.matches' %}class="active"{% endif %}>Matches</a>
-      <a href="{{ url_for('main.squads') }}" {% if request.endpoint == 'main.squads' %}class="active"{% endif %}>My Squads</a>
-      <a href="{{ url_for('main.stats') }}" {% if request.endpoint == 'main.stats' %}class="active"{% endif %}>My Stats</a>
-      <a href="{{ url_for('main.players') }}" {% if request.endpoint == 'main.players' %}class="active"{% endif %}>Player Stats</a>
-      <a href="{{ url_for('main.builder') }}" {% if request.endpoint == 'main.builder' %}class="active"{% endif %}>Squad Builder</a>
-    </nav>
+      <div class="topbar-right">
+        <form method="post" action="{{ url_for('main.refresh_now') }}" data-refresh style="display:inline">
+          <button type="submit" class="btn-chrome" data-refresh-button {% if refresh_running %}disabled{% endif %}>
+            {% if refresh_running %}Refreshing: {{ refresh_stage }}…{% else %}Refresh now{% endif %}
+          </button>
+        </form>
+        {# Label and glyph are filled in by app.js, which is the only thing that
+           knows which theme actually resolved. #}
+        <button type="button" class="theme-toggle" data-theme-toggle
+                title="Switch theme" aria-label="Switch theme"></button>
+      </div>
+    </div>
+  </div>
 
-    <div class="topbar-right">
-      <form method="post" action="{{ url_for('main.refresh_now') }}" data-refresh style="display:inline">
-        <button type="submit" data-refresh-button {% if refresh_running %}disabled{% endif %}>
-          {% if refresh_running %}Refreshing: {{ refresh_stage }}…{% else %}Refresh now{% endif %}
-        </button>
-      </form>
+  <div class="topbar-navrow">
+    <div class="topbar-inner">
+      <nav class="pages">
+        <a href="{{ url_for('main.matches') }}" {% if request.endpoint == 'main.matches' %}class="active"{% endif %}>Matches</a>
+        <a href="{{ url_for('main.squads') }}" {% if request.endpoint == 'main.squads' %}class="active"{% endif %}>My Squads</a>
+        <a href="{{ url_for('main.stats') }}" {% if request.endpoint == 'main.stats' %}class="active"{% endif %}>My Stats</a>
+        <a href="{{ url_for('main.players') }}" {% if request.endpoint == 'main.players' %}class="active"{% endif %}>Player Stats</a>
+        <a href="{{ url_for('main.builder') }}" {% if request.endpoint == 'main.builder' %}class="active"{% endif %}>Squad Builder</a>
+      </nav>
     </div>
   </div>
 </header>
@@ -67,6 +83,7 @@
     </span>
     {% if freshness.projections_built_at %}<span>Projections: {{ freshness.projections_built_at | fmt_time }}</span>{% endif %}
     {% if freshness.historical_synced_at %}<span>History: {{ freshness.historical_synced_at | fmt_time }}</span>{% endif %}
+    {% if app_version %}<span class="foot-version" title="FPL Helper {{ app_version }}">v{{ app_version }}</span>{% endif %}
   </footer>
 </main>
 
