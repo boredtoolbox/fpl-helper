@@ -29,7 +29,7 @@ Linux install, with Pi-specific notes where the two differ.
 | **My Squads** (`/`) | Your current squad on a pitch, in real club kits, split into keeper / defence / midfield / attack. Per player: what they actually scored that gameweek, their projection, fixture difficulty and availability. Up top: the next transfer deadline, what the squad scored, and what the XI is projected to score next. |
 | **My Stats** (`/stats`) | Gameweek points and ranks, plus your position in every classic league you've joined. |
 | **Squad Builder** (`/builder`) | Two sections. First, the strongest **seven options in each position** for the next ten gameweeks (or however many are left), ranked on what they have been scoring, the difficulty of the run ahead, this app's xPts and FPL's own EP. Second, **what your YouTube creators are saying**: who each of them is telling you to buy, sell, keep, start or captain, in your configured trust order. Both halves describe a player with the same figures: club, price, the fixture run, points per game, minutes per game, xG per game and xA per game. |
-| **Player Stats** (`/players`) | Every player, sortable and filterable, with the underlying numbers: xG, xA, xGI, xGC, DefCon reliability, minutes, form, price, ownership and points per million. Each row opens on this season match by match and a per-opponent history, and any two or more rows can be ticked into a side-by-side panel. Both are described below. |
+| **Player Stats** (`/players`) | Every player, sortable and filterable, with the underlying numbers: xG, xA, xGI, xGC, DefCon reliability, minutes, form, price, ownership and points per million. Clicking a name opens a side panel with this season match by match and a per-opponent history, and any two or more rows can be ticked into a side-by-side comparison. Both are described below. |
 
 Matches is the one page with no team selector, because it is about the league
 rather than about you. Every other page carries its own **team selector** at the
@@ -37,13 +37,18 @@ top, so switching squad is one click from wherever you are and the choice
 follows you between pages. On Player Stats it marks the players you already own
 and can filter down to them.
 
-The fixture ticker, six cells coloured by FPL difficulty, appears throughout;
-italics mean an away fixture.
+The fixture ticker, six cells coloured by FPL difficulty, appears throughout.
+A 🏠 marks a home fixture and an ✈️ an away one.
 
-### What the caret opens
+The whole interface follows the official FPL site, down to its exact
+fixture-difficulty colours, and ships in **light and dark**. The switch sits in
+the top bar next to "Refresh now": it starts on whatever your computer is set
+to, and remembers your choice once you press it.
 
-The caret next to a name on Player Stats opens three blocks of context, fetched
-on demand rather than shipped with the table:
+### What a player's name opens
+
+Clicking a player's name on Player Stats opens a panel from the right with
+three blocks of context, fetched on demand rather than shipped with the table:
 
 * **This season, game by game**: every match the club has played, oldest first,
   with the opponent and the scoreline, then minutes, goals, assists, DefCon,
@@ -62,7 +67,7 @@ DefCon count for everyone else, and no clean sheet column for forwards. A game
 the player watched keeps its row, because a run of blanks is how rotation and a
 knock look before they reach the news feed, but its numbers are dashed rather
 than zeroed: 0 goals from the bench is not a quiet afternoon on the pitch.
-Anything that returned is picked out in amber, including the DefCon shifts that
+Anything that returned is picked out in green, including the DefCon shifts that
 actually cleared the threshold and banked the two points.
 
 A club that has no history against an opponent says so, and says *why*: newly
@@ -1320,9 +1325,8 @@ app/
     shortlist.py    Squad Builder: per-position scoring + the creator board
     kits.py         team imagery: shirts and crests, cached under static/
 templates/          Jinja2, one per page plus shared macros
-static/             one stylesheet, one small JS file
+static/             one stylesheet, two small JS files
 tools/              find_channel_id.py, check_bundle.py
-tests/
 run.py              server entry point: all interfaces, cron owns the schedule
 desktop.py          packaged entry point: localhost, opens a browser, self-schedules
 fpl-helper.spec     PyInstaller allowlist
@@ -1354,7 +1358,7 @@ gameweek deadline passes, so the page stays empty until your first deadline.
 **Everything shows zero.** Run `python -m app.refresh` and check `logs/fpl-helper.log`.
 
 **A player projects 0.00 xPts.** They're almost certainly flagged. Check the
-Status column on the Player Stats page; a 0% chance of playing forces the
+St column on the Player Stats page; a 0% chance of playing forces the
 projection to zero by design.
 
 **The crowd panel says "Running on statistics alone."** No Gemini key, or the
@@ -1370,13 +1374,6 @@ normally clears within the hour. Nothing else in the refresh is affected.
 **A historical dataset download fails.** The app keeps using the CSVs already
 on disk and logs a warning — stale history beats no history. Force a fresh
 fetch with `python -m app.refresh --force-historical`.
-
-**Upgrading from a version that cloned the dataset.** Nothing to do: the
-downloads land on the same paths the clone used, so the app carries on reading
-them. The old checkout under `historical_data_dir` is dead weight after that —
-deleting the whole directory is safe and reclaims about 115 MB, and the next
-refresh re-fetches the ~11 MB it actually needs. The app logs a reminder while
-the old `.git` directory is still there.
 
 ## Licence
 
