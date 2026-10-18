@@ -207,36 +207,9 @@ def builder():
         lists, meta = shortlist(rows.values(), min_minutes, TOP_N)
         board = creator_board(conn, _cfg(), rows)
 
-        # Which gameweeks the projection engine actually reaches. Its horizon is
-        # configured separately and is usually shorter than this page's, and the
-        # page says so rather than implying ten gameweeks of projection.
-        xpts_events = sorted(
-            {
-                r["event"] for r in conn.execute(
-                    "SELECT DISTINCT event FROM projections ORDER BY event"
-                )
-            }
-            & set(events)
-        )
-
-        # Early in a season form, EP and points per game are three names for the
-        # same handful of matches, and a weighted blend of one number is that
-        # number. Counted rather than assumed, so the page only mentions it when
-        # it is actually true.
-        identical = sum(
-            1 for p in meta["pool"]
-            if abs(p["form"] - p["ep_next"]) < 0.05 and abs(p["form"] - p["ppg"]) < 0.05
-        )
-
-        gw = gameweek_info(conn)
-        played = (gw["current"] or {}).get("id") or max(
-            ((gw["next"] or {}).get("id") or 1) - 1, 0
-        )
-
         return render_template(
             "builder.html",
             events=events,
-            xpts_events=xpts_events,
             horizon=horizon,
             min_minutes=min_minutes,
             top_n=TOP_N,
@@ -244,11 +217,6 @@ def builder():
             meta=meta,
             board=board,
             pool_size=len(rows),
-            played_gws=played,
-            identical_baselines=identical,
-            identical_baselines_pct=(
-                round(100 * identical / meta["eligible"]) if meta["eligible"] else 0
-            ),
             weights={"perf": W_PERF, "ep": W_EP, "xpts": W_XPTS},
             fdr_multiplier=FDR_MULTIPLIER,
             position_panels=[

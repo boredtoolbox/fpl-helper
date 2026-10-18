@@ -5,8 +5,8 @@ Two questions, one page, one set of numbers:
 
   * Who are the strongest seven options in each position for the gameweeks
     ahead?
-  * Of the YouTube creators the user follows, who is telling them to buy, sell,
-    keep, start or captain whom?
+  * Who are the YouTube creators the user follows telling them to buy, sell,
+    keep, start or captain, pooled across all of them?
 
 Both halves describe a player with the same figures — club, price, the fixture
 run, and four per-game rates — so a name that turns up in both can be read
@@ -372,12 +372,6 @@ def shortlist(
     }
     excluded_crowd.sort(key=lambda p: -p["score"])
     return by_position, {
-        # The whole eligible pool, not just the shortlisted, because the page
-        # says things about it — how many players cleared the gates, and how
-        # many of them have form, EP and points per game sitting on the same
-        # number. Recomputing the gates outside here to answer that would be two
-        # copies of the same three conditions.
-        "pool": eligible,
         "eligible": len(eligible),
         "dropped": dropped,
         "excluded_crowd": excluded_crowd,
@@ -391,7 +385,8 @@ def shortlist(
 # The crowd layer stores one row per player per run, merged across every source
 # that mentioned them, with each entry in `reasons` naming its own source —
 # "Let's Talk FPL: expected to be rotated after midweek". That prefix is the
-# only per-creator attribution there is, so it is what this reads.
+# only per-creator attribution there is, so it is what this reads to tell a
+# creator's line from an official flag or a news item.
 #
 # What it cannot read is a structured verdict, because nothing asks for one: the
 # extraction schema captures availability, a start-probability hint and a
@@ -463,9 +458,8 @@ def _match_key(name: str) -> str:
 def configured_creators(conn: sqlite3.Connection, cfg) -> list[dict[str, Any]]:
     """The user's creators in their configured rank order, with last-run status.
 
-    Rank is load-bearing elsewhere — it decides who keeps their transcript slot
-    when the budget runs out — so the page shows them in that order too rather
-    than by how much they happened to say.
+    This is what decides which `reasons` prefixes count as a creator at all;
+    anything else is an official flag or a news feed.
 
     `crowd_channel_status` is written by the gatherer on every run and records
     how many videos and transcripts each channel actually yielded. Without it a
@@ -500,7 +494,6 @@ def configured_creators(conn: sqlite3.Connection, cfg) -> list[dict[str, Any]]:
                 "state": status.get("state"),
                 "videos": status.get("videos"),
                 "transcripts": status.get("transcripts"),
-                "mentions": [],
             }
         )
     return creators
@@ -509,10 +502,15 @@ def configured_creators(conn: sqlite3.Connection, cfg) -> list[dict[str, Any]]:
 def creator_board(
     conn: sqlite3.Connection, cfg, rows: dict[int, dict[str, Any]]
 ) -> dict[str, Any]:
-    """Per-creator verdicts from the most recent crowd run.
+    """Every creator's lines from the most recent crowd run, pooled per player.
 
-    Every mention carries the player's full row, so the table under a creator
-    shows exactly the same figures as the shortlists above it.
+    One row per player rather than one table per creator: the page answers "who
+    are the creators talking about, and what are they saying", not "what did
+    each of them say". The configured list is still what decides which sources
+    count as creators.
+
+    Every row carries the player's full row, so the table shows exactly the same
+    figures as the shortlists above it.
     """
     creators = configured_creators(conn, cfg)
     by_key = {_match_key(c["name"]): c for c in creators}
@@ -520,11 +518,14 @@ def creator_board(
 
     unattributed = 0
     other_sources: dict[str, int] = {}
+    heard_from: set[str] = set()
+    players: list[dict[str, Any]] = []
 
     for pid, intel in crowd.items():
         row = rows.get(pid)
         if row is None:
             continue
+        lines: list[dict[str, Any]] = []
         for reason in intel["reasons"]:
             parsed = _QUOTE_SPLIT.match(str(reason))
             if not parsed:
@@ -538,34 +539,51 @@ def creator_board(
                 # them keeps the totals on the page honest.
                 other_sources[source] = other_sources.get(source, 0) + 1
                 continue
+            heard_from.add(creator["source"])
             key, label = read_verdict(quote, intel["availability"])
-            creator["mentions"].append(
-                {
-                    "player": row,
-                    "quote": quote,
-                    "verdict": key,
-                    "verdict_label": label,
-                    "availability": intel["availability"],
-                    "sentiment": intel["sentiment"],
-                    "confidence": intel["confidence"],
-                    "n_sources": intel["n_sources"],
-                    "role_change": intel["role_change"],
-                }
-            )
+            lines.append({"quote": quote, "verdict": key, "verdict_label": label})
+        if not lines:
+            continue
 
-    for creator in creators:
-        creator["mentions"].sort(
-            key=lambda m: (VERDICT_RANK.get(m["verdict"], 9), -m["player"]["score"])
+        lines.sort(key=lambda m: VERDICT_RANK.get(m["verdict"], 9))
+        # The distinct readings with how many lines each, so "Buy ×3, Sell"
+        # shows a split opinion at a glance instead of hiding it in one chip.
+        verdicts: dict[str, dict[str, Any]] = {}
+        for line in lines:
+            v = verdicts.setdefault(
+                line["verdict"], {"key": line["verdict"], "label": line["verdict_label"], "n": 0}
+            )
+            v["n"] += 1
+        players.append(
+            {
+                "player": row,
+                "lines": lines,
+                "verdicts": list(verdicts.values()),
+                "availability": intel["availability"],
+                "sentiment": intel["sentiment"],
+                "confidence": intel["confidence"],
+                "n_sources": intel["n_sources"],
+                "role_change": intel["role_change"],
+            }
         )
-        creator["count"] = len(creator["mentions"])
+
+    players.sort(
+        key=lambda m: (
+            VERDICT_RANK.get(m["lines"][0]["verdict"], 9),
+            -len(m["lines"]),
+            -m["player"]["score"],
+        )
+    )
 
     return {
-        "creators": creators,
+        "players": players,
         "run": run,
+        "creators_configured": len(creators),
+        "creators_heard": len(heard_from),
         "unattributed": unattributed,
         "other_sources": sorted(
             ({"name": k, "n": v} for k, v in other_sources.items()),
             key=lambda s: -s["n"],
         )[:6],
-        "total": sum(c["count"] for c in creators),
+        "total": sum(len(m["lines"]) for m in players),
     }

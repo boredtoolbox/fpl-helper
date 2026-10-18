@@ -1565,28 +1565,13 @@ footer.foot .fresh-fail { color: var(--bad); font-weight: 600; }
 }
 
 /* --- Squad Builder ------------------------------------------------------ */
-/* Rank column on the shortlists and the creator strip. Quiet on purpose: the
+/* Rank column on the shortlists. Quiet on purpose: the
    order is already the order the rows are in, so the number only has to confirm
    it, not announce it. */
 td.rank { color: var(--on-surface-faint); font-size: 0.78rem; width: 1%; }
-.rank-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 19px;
-  height: 19px;
-  border-radius: 50%;
-  border: 1px solid var(--outline-variant);
-  background: var(--surface-variant);
-  color: var(--on-surface-variant);
-  font-size: 0.68rem;
-  font-weight: 700;
-  margin-right: 6px;
-  vertical-align: 1px;
-}
 
-/* Average difficulty over the run, on FPL's difficulty scale so the summary and
-   the detail read as one thing. The text colour is set per step by .fdr-N. */
+/* A single FPL difficulty figure, used on the match list. The text colour is
+   set per step by .fdr-N. */
 .fdr-pill {
   display: inline-block;
   min-width: 31px;
@@ -1599,8 +1584,8 @@ td.rank { color: var(--on-surface-faint); font-size: 0.78rem; width: 1%; }
 
 /* What a creator's line amounts to. Colour carries the direction — green for
    the calls that put a player in your team, red for the ones that take him out,
-   neutral for "they talked about him and did not commit" — so a creator's
-   column can be scanned without reading a word of it. */
+   neutral for "they talked about him and did not commit" — so the column can
+   be scanned without reading a word of it. */
 .verdict {
   display: inline-block;
   padding: 2px 8px;
@@ -1631,7 +1616,15 @@ td.said {
   line-height: 1.4;
 }
 
-/* The player-level note under a creator's sentence. Set apart on its own line
+/* One creator's sentence among several pooled on a player's row. */
+.said-line { display: block; }
+.said-line + .said-line {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dotted var(--outline-variant);
+}
+
+/* The player-level note under the creators' sentences. Set apart on its own line
    because it did not come from them. */
 .said-note {
   display: block;

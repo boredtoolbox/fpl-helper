@@ -99,21 +99,23 @@
    point of the page is that the shortlists and the creator tables describe a
    player identically — two copies of this would drift apart on the first
    edit. #}
-{% macro stat_headers(fixtures_label) -%}
+{% macro stat_headers(fixtures_label, with_pts=false) -%}
 <th data-type="text" title="Club, by three-letter code.">Team</th>
 <th class="num" title="Current price: FPL's cost ÷ 10.">£m</th>
 <th data-nosort title="{{ fixtures_label }}&#10;Colour is FPL's own difficulty rating, 1 (easy) to 5 (hard). 🏠 home, ✈️ away.&#10;A · is a blank gameweek; two cells under one gameweek is a double.">Fixtures</th>
-<th class="num" title="FPL's points per game: total points ÷ matches appeared in.">PPG</th>
+{% if with_pts %}<th class="num" title="Total FPL points so far this season.">Pts</th>
+{% endif %}<th class="num" title="FPL's points per game: total points ÷ matches appeared in.">PPG</th>
 <th class="num" title="Minutes ÷ matches appeared in. How long they last when they feature — a nailed 90 reads very differently from an hour off the bench.">Min/G</th>
 <th class="num" title="Expected goals ÷ matches appeared in, from FPL's xG model. How good the chances were, whether or not they were taken.">xG/G</th>
 <th class="num" title="Expected assists ÷ matches appeared in. How good the chances created were, whether or not they were converted.">xA/G</th>
 {%- endmacro %}
 
-{% macro stat_cells(p) -%}
+{% macro stat_cells(p, with_pts=false) -%}
 <td><span class="team-tag" title="{{ p.team_name }}">{{ p.team }}</span></td>
 <td class="num">{{ '%.1f' % p.price }}</td>
 <td>{{ ticker_long(p.fixtures) }}</td>
-<td class="num">{{ '%.1f' % p.ppg }}</td>
+{% if with_pts %}<td class="num">{{ p.total_points }}</td>
+{% endif %}<td class="num">{{ '%.1f' % p.ppg }}</td>
 {# All four rates divide by appearances, so a player who has never featured has
    no denominator. A dash says that; a 0.00 would claim we measured something. #}
 <td class="num" data-sort="{{ p.mins_per_game }}">{% if p.games %}{{ '%.0f' % p.mins_per_game }}{% else %}<span class="miss">—</span>{% endif %}</td>

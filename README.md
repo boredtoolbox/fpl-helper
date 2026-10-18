@@ -28,7 +28,7 @@ Linux install, with Pi-specific notes where the two differ.
 | **Matches** (`/matches/<gw>`) | The league's own fixtures and results, rather than anything about your squad. **One gameweek per page**, laid out like the Premier League's own fixture pages: club crests either side of the score, a step either side of the bar and the whole season as a strip between them, matches grouped by the day they are played on. Before kickoff, the time and each side's difficulty rating; after it, the scoreline with goalscorers, assists and cards. `/matches` redirects to whichever gameweek is being played, or the one next up. |
 | **My Squads** (`/`) | Your current squad on a pitch, in real club kits, split into keeper / defence / midfield / attack. Per player: what they actually scored that gameweek, their projection, fixture difficulty and availability. Up top: the next transfer deadline, what the squad scored, and what the XI is projected to score next. |
 | **My Stats** (`/stats`) | Gameweek points and ranks, plus your position in every classic league you've joined. |
-| **Squad Builder** (`/builder`) | Two sections. First, the strongest **seven options in each position** for the next ten gameweeks (or however many are left), ranked on what they have been scoring, the difficulty of the run ahead, this app's xPts and FPL's own EP. Second, **what your YouTube creators are saying**: who each of them is telling you to buy, sell, keep, start or captain, in your configured trust order. Both halves describe a player with the same figures: club, price, the fixture run, points per game, minutes per game, xG per game and xA per game. |
+| **Squad Builder** (`/builder`) | Two sections. First, the strongest **seven options in each position** for the next ten gameweeks (or however many are left), ranked on what they have been scoring, the difficulty of the run ahead, this app's xPts and FPL's own EP. Each row shows season total points alongside FPL's EP and this app's xPts; the ranking score orders the tables but is not shown. Second, **what your YouTube creators are saying**: one table pooling every creator's lines per player, with who they are being told to buy, sell, keep, start or captain. Both halves describe a player with the same figures: club, price, the fixture run, points per game, minutes per game, xG per game and xA per game. |
 | **Player Stats** (`/players`) | Every player, sortable and filterable, with the underlying numbers: xG, xA, xGI, xGC, DefCon reliability, minutes, form, price, ownership and points per million. Clicking a name opens a side panel with this season match by match and a per-opponent history, and any two or more rows can be ticked into a side-by-side comparison. Both are described below. |
 
 Matches is the one page with no team selector, because it is about the league
@@ -1111,7 +1111,7 @@ earns a little from cameo minutes.
 
 ## How the Squad Builder scores a player
 
-Four inputs, and only four, which are the ones the page says it uses:
+Four inputs, and only four (the same breakdown is in the tooltip on the rank column):
 
 ```
 performance   = 0.50 x form  +  0.50 x points per game     (FPL points per match)
@@ -1148,11 +1148,6 @@ has to be available (FPL's own flags, *and* not reported injured or suspended by
 the crowd layer, since anyone the engine has zeroed cannot be recommended here),
 and has to clear the minutes floor, which is the page's one adjustable filter.
 
-Early in a season form, EP and points per game are three names for the same
-handful of matches, and a weighted blend of one number is that number. The page
-counts how many eligible players that is currently true of and says so, rather
-than implying a blend it is not doing.
-
 **Per-game rates** for minutes, xG and xA divide by *appearances*, not by
 gameweeks: a rotation option who has featured twice in six weeks is described by
 the two matches he played, not marked down for the four he watched. Appearances
@@ -1164,31 +1159,27 @@ sitting on exactly zero points.
 
 ## What your creators are saying
 
-The second half of the Squad Builder turns the crowd layer's output back into
-per-creator advice, in the trust order you configured.
+The second half of the Squad Builder pools every creator's lines into **one
+table, one row per player**. It answers "who are the creators talking about and
+what are they saying", not "what did each of them say", so there are no
+per-creator panels.
 
 The crowd layer stores **one merged row per player**, holding availability, a
 sentiment score and a role note, with each line in `reasons` naming the source
-that said it ("Let's Talk FPL: expected to be rotated after midweek"). That
-prefix is the only per-creator attribution there is, so it is what the page
-reads. Lines from Official FPL and the news feeds are counted and excluded; they
-are not creators, and they already drive the availability flags everywhere else.
+that said it ("Let's Talk FPL: expected to be rotated after midweek"). The page
+uses that prefix only to tell a creator's line from anything else: lines from
+Official FPL and the news feeds are counted and excluded, because they are not
+creators and they already drive the availability flags everywhere else.
 
-What the schema does *not* record is a structured verdict, so the chip beside
-each line, one of **captain / buy / sell / keep / start / minutes risk / out**,
-is a reading of that creator's own wording, and the sentence itself is always
-printed next to it. Where the wording does not commit either way the chip says
-"mentioned" rather than guessing. Sentiment and the role note are merged across
-every source, so they sit in their own column labelled as such rather than being
-attributed to whoever's row they happen to be on.
-
-Every configured creator gets a panel whether or not they said anything, so a
-channel that has gone quiet is visible as an empty panel rather than as an
-absence you have to notice. Where it is empty the panel says which kind of empty
-it is, from `meta.crowd_channel_status`: the run could not read the channel, or
-it read N transcripts and none of them named a player. A channel with videos but
-no transcripts is usually YouTube rate-limiting the scraper, not the creator
-going quiet.
+What the schema does *not* record is a structured verdict, so each line's
+reading, one of **captain / buy / sell / keep / start / minutes risk / out**, is
+taken from the wording, and the sentences themselves are always printed next to
+the chips. A player's row shows each distinct reading once with a count
+("Buy ×3", "Sell"), so a split opinion stays visible. Where the wording does not
+commit either way the chip says "mentioned" rather than guessing. Rows are
+ordered by their strongest call, then by how many lines mention the player, then
+by the ranking score. Sentiment and the role note are merged across every
+source, so they sit in their own column labelled as such.
 
 ---
 
