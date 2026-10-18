@@ -727,7 +727,7 @@ walk of the FPL API happens once, ever.
 
 ### Which version am I on?
 
-* **The footer of any page**, at the right-hand end — `v1.2.0`. This is the one
+* **The footer of any page**, at the right-hand end — `v1.3.0`. This is the one
   that works everywhere, including the downloadable app, where there is no
   checkout to inspect and no terminal habit to rely on.
 * **From a terminal** — `fpl-helper --version` for the downloadable app, or
